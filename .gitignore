@@ -16,3 +16,7 @@ local.properties
 
 # Documentation
 docs/
+
+# Local build/cache artifacts
+/.kotlin/
+/classes.jar
