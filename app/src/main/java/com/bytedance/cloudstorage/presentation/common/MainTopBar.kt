@@ -64,15 +64,16 @@ fun MainTopBar(
                 onClick = onTransferClick
             )
             // 搜索按钮
-            IconButton(onClick = onSearchClick) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "搜索"
-                )
-            }
+//            IconButton(onClick = onSearchClick) {
+//                Icon(
+//                    imageVector = Icons.Default.Search,
+//                    contentDescription = "搜索"
+//                )
+//            }
         },
         colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = Color.White,
+            scrolledContainerColor = Color.White
         )
     )
 }
@@ -92,7 +93,7 @@ private fun TabBar(
     val tabs = listOf("网盘", "文件")
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalArrangement = Arrangement.spacedBy(36.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         tabs.forEachIndexed { index, title ->
@@ -123,7 +124,7 @@ private fun TabItem(
     ) {
         Text(
             text = title,
-            fontSize = 16.sp,
+            fontSize = 20.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             color = if (isSelected) {
                 MaterialTheme.colorScheme.onSurface

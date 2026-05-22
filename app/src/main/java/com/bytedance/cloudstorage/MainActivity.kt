@@ -15,13 +15,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bytedance.cloudstorage.presentation.common.MainTopBar
 import com.bytedance.cloudstorage.presentation.filelist.FileListScreen
+import com.bytedance.cloudstorage.presentation.home.FileType
 import com.bytedance.cloudstorage.presentation.home.HomeScreen
+import com.bytedance.cloudstorage.presentation.home.RecentFileItem
 import com.bytedance.cloudstorage.ui.theme.CloudStorageTheme
+import com.bytedance.cloudstorage.utils.ScreenUtils
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 初始化 ScreenUtils，基准设计稿宽度 390px
+        ScreenUtils.init(this, designWidth = 390f)
+
         enableEdgeToEdge()
         setContent {
             CloudStorageTheme {
@@ -31,31 +38,43 @@ class MainActivity : ComponentActivity() {
                 // 两个 Tab 对应的页面：0=网盘，1=文件
                 val pagerState = rememberPagerState(pageCount = { 2 })
 
+                // ── 测试数据，后续由 ViewModel + Room 提供 ──
+                val now = System.currentTimeMillis()
+                val mockRecentViews = listOf(
+                    RecentFileItem(
+                        name = "需求说明.txt",
+                        type = FileType.TXT,
+                        timestamp = now - 9 * 60 * 1000,   // 9 分钟前
+                        location = "项目资料"
+                    ),
+                    RecentFileItem(
+                        name = "产品演示.mp4",
+                        type = FileType.VIDEO,
+                        timestamp = now - 15 * 60 * 1000,  // 15 分钟前
+                        location = "视频"
+                    ),
+                )
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
                         MainTopBar(
                             selectedTab = pagerState.currentPage,
                             onTabSelected = { index ->
-                                // 点击 Tab → 平滑滚动到对应页面
                                 coroutineScope.launch {
                                     pagerState.animateScrollToPage(index)
                                 }
                             },
-                            transferTaskCount = 0, // MVP 阶段无真实任务，后续从 ViewModel 获取
+                            transferTaskCount = 0,
                             onTransferClick = {
-                                // MVP 阶段仅 Toast，后续跳转到 TransferScreen
                                 Toast.makeText(context, "传输页（待实现）", Toast.LENGTH_SHORT).show()
                             },
                             onSearchClick = {
-                                // MVP 阶段仅 Toast，后续跳转到搜索页
                                 Toast.makeText(context, "搜索（待实现）", Toast.LENGTH_SHORT).show()
                             }
                         )
                     }
                 ) { innerPadding ->
-                    // HorizontalPager 托管网盘和文件两个页面
-                    // 滑动页面时 Tab 高亮通过 pagerState.currentPage 自动同步
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier
@@ -63,7 +82,12 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding)
                     ) { page ->
                         when (page) {
-                            0 -> HomeScreen()
+                            0 -> HomeScreen(
+                                usedStorageG = 4.9f,
+                                totalStorageG = 10f,
+                                recentSaves = emptyList(),  // 空状态
+                                recentViews = mockRecentViews,
+                            )
                             1 -> FileListScreen()
                         }
                     }
