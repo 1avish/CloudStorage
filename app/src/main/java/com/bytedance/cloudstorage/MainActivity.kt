@@ -15,9 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bytedance.cloudstorage.presentation.common.MainTopBar
 import com.bytedance.cloudstorage.presentation.filelist.FileListScreen
-import com.bytedance.cloudstorage.presentation.home.FileType
 import com.bytedance.cloudstorage.presentation.home.HomeScreen
-import com.bytedance.cloudstorage.presentation.home.RecentFileItem
 import com.bytedance.cloudstorage.ui.theme.CloudStorageTheme
 import com.bytedance.cloudstorage.utils.ScreenUtils
 import kotlinx.coroutines.launch
@@ -35,25 +33,7 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val coroutineScope = rememberCoroutineScope()
 
-                // 两个 Tab 对应的页面：0=网盘，1=文件
                 val pagerState = rememberPagerState(pageCount = { 2 })
-
-                // ── 测试数据，后续由 ViewModel + Room 提供 ──
-                val now = System.currentTimeMillis()
-                val mockRecentViews = listOf(
-                    RecentFileItem(
-                        name = "需求说明.txt",
-                        type = FileType.TXT,
-                        timestamp = now - 9 * 60 * 1000,   // 9 分钟前
-                        location = "项目资料"
-                    ),
-                    RecentFileItem(
-                        name = "产品演示.mp4",
-                        type = FileType.VIDEO,
-                        timestamp = now - 15 * 60 * 1000,  // 15 分钟前
-                        location = "视频"
-                    ),
-                )
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -82,12 +62,8 @@ class MainActivity : ComponentActivity() {
                             .padding(innerPadding)
                     ) { page ->
                         when (page) {
-                            0 -> HomeScreen(
-                                usedStorageG = 4.9f,
-                                totalStorageG = 10f,
-                                recentSaves = emptyList(),  // 空状态
-                                recentViews = mockRecentViews,
-                            )
+                            // HomeScreen 内部自行创建 ViewModel 并加载数据
+                            0 -> HomeScreen()
                             1 -> FileListScreen()
                         }
                     }
