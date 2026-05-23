@@ -1,6 +1,5 @@
 package com.bytedance.cloudstorage.presentation.home
 
-import android.hardware.camera2.params.BlackLevelPattern
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -32,8 +31,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,13 +42,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 import java.text.SimpleDateFormat
@@ -62,54 +59,41 @@ import java.util.concurrent.TimeUnit
 // ────────────────────────────────────────────────
 // 颜色常量，与设计稿对齐
 // ────────────────────────────────────────────────
-private val BgGray       = Color(0xFFF5F6F8)
-private val IconBlue     = Color(0xFF2979FF)
-private val IconPink     = Color(0xFFEB2F96)
-private val IconBgBlue   = Color(0xFFF0F5FF)
-private val IconBgPink   = Color(0xFFFFF0F5)
+private val BgGray         = Color(0xFFF5F6F8)
+private val IconBlue       = Color(0xFF2979FF)
+private val IconPink       = Color(0xFFEB2F96)
+private val IconBgBlue     = Color(0xFFF0F5FF)
+private val IconBgPink     = Color(0xFFFFF0F5)
 private val ProgressBlue   = Color(0xFF2979FF)
 private val ProgressYellow = Color(0xFFFAAD14)
 private val ProgressRed    = Color(0xFFFF4D4F)
-private val TextPrimary   = Color(0xFF1D2129)
-private val TextSecondary = Color(0xFF8C93A4)
-private val TextGray      = Color(0xFFB0B4C1)
-private val DividerColor  = Color(0xFFF5F6F8)
-private val ChevronGray   = Color(0xFFC0C4D0)
+private val TextPrimary    = Color(0xFF1D2129)
+private val TextSecondary  = Color(0xFF8C93A4)
+private val TextGray       = Color(0xFFB0B4C1)
+private val DividerColor   = Color(0xFFF5F6F8)
+private val ChevronGray    = Color(0xFFC0C4D0)
 
 // ────────────────────────────────────────────────
-// 数据模型（临时硬编码，后续由 ViewModel + Room 提供）
-// ────────────────────────────────────────────────
-
-/** 文件类型枚举 */
-enum class FileType { TXT, VIDEO }
-
-/** 最近浏览 / 转存记录 */
-data class RecentFileItem(
-    val name: String,
-    val type: FileType,
-    val timestamp: Long,        // 毫秒时间戳
-    val location: String,       // 所在文件夹名称
-)
-
-// ────────────────────────────────────────────────
-// 网盘首页主组件
+// 网盘首页主组件（接入 ViewModel）
 // ────────────────────────────────────────────────
 
 /**
  * 网盘 Tab 首页
  *
- * @param usedStorageG   已用存储（GB），MVP 阶段硬编码
- * @param totalStorageG  总存储（GB）
- * @param recentSaves    最近转存列表（最多取前 3 条）
- * @param recentViews    最近浏览列表（最多取前 3 条）
+ * 数据来源：HomeViewModel → Mock JSON → Room 数据库 → Flow → UI
+ * 无需外部传参，内部通过 viewModel() 创建并收集状态。
  */
 @Composable
 fun HomeScreen(
-    usedStorageG: Float = 4.9f,
-    totalStorageG: Float = 10f,  // 超出时进度条满，颜色为红
-    recentSaves: List<RecentFileItem> = emptyList(),
-    recentViews: List<RecentFileItem> = emptyList(),
+    viewModel: HomeViewModel = viewModel()
 ) {
+    // 收集 ViewModel 中的 StateFlow，生命周期感知
+    val usedStorageG  by viewModel.usedStorageG.collectAsStateWithLifecycle()
+    val totalStorageG by viewModel.totalStorageG.collectAsStateWithLifecycle()
+    val recentViews   by viewModel.recentViews.collectAsStateWithLifecycle()
+    val recentSaves   by viewModel.recentSaves.collectAsStateWithLifecycle()
+    val isLoading     by viewModel.isLoading.collectAsStateWithLifecycle()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -134,7 +118,7 @@ fun HomeScreen(
             RecentFileCard(
                 title = "最近转存",
                 emptyHint = "暂无转存记录",
-                items = recentSaves.take(3),
+                items = recentSaves,
             )
         }
         // 最近浏览
@@ -142,7 +126,7 @@ fun HomeScreen(
             RecentFileCard(
                 title = "最近浏览",
                 emptyHint = "暂无浏览记录",
-                items = recentViews.take(3),
+                items = recentViews,
             )
         }
     }
@@ -152,6 +136,12 @@ fun HomeScreen(
 // 个人信息卡片
 // ────────────────────────────────────────────────
 
+/**
+ * 个人信息卡片，展示头像、存储使用量和进度条。
+ *
+ * @param usedStorageG  已用存储（GB）
+ * @param totalStorageG 总存储（GB），用于计算进度条百分比
+ */
 @Composable
 private fun PersonalSpaceCard(
     usedStorageG: Float,
@@ -160,7 +150,7 @@ private fun PersonalSpaceCard(
     // 进度条百分比，允许超过 100%（溢出显示满条红色）
     val percent = (usedStorageG / totalStorageG).coerceIn(0f, 1f)
     val progressColor = when {
-        percent < 0.6f  -> ProgressBlue
+        percent < 0.6f   -> ProgressBlue
         percent <= 0.85f -> ProgressYellow
         else             -> ProgressRed
     }
@@ -198,7 +188,7 @@ private fun PersonalSpaceCard(
             Spacer(modifier = Modifier.width(14.w.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                // 文字行：我的空间：14.9G / 10G
+                // 文字行：我的空间：XG / XG
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = "我的空间：",
@@ -209,7 +199,7 @@ private fun PersonalSpaceCard(
                         text = "${usedStorageG}G",
                         fontSize = 16.ws.sp,
                         fontWeight = FontWeight.Bold,
-                        color =progressColor,
+                        color = progressColor,
                     )
                     Text(
                         text = " / ${totalStorageG}G",
@@ -250,13 +240,13 @@ private fun PersonalSpaceCard(
  *
  * @param title    卡片标题
  * @param emptyHint 无数据时的提示文字
- * @param items    文件列表（最多 3 条）
+ * @param items     文件列表（由 DAO 查询限制最多 3 条）
  */
 @Composable
 private fun RecentFileCard(
     title: String,
     emptyHint: String,
-    items: List<RecentFileItem>,
+    items: List<RecentFileWithParent>,
 ) {
     // 折叠状态，默认展开
     var expanded by remember { mutableStateOf(true) }
@@ -307,14 +297,15 @@ private fun RecentFileCard(
                             RecentFileItemRow(item)
                             // 非最后一项显示分割线
                             if (index < items.lastIndex) {
+                                Spacer(modifier = Modifier.height(8.w.dp))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(start = 58.w.dp)
-                                        .height(1.dp)
+                                        .padding(horizontal = 12.w.dp)
+                                        .height(2.dp)
                                         .background(DividerColor)
                                 )
-                                Spacer(modifier = Modifier.height(22.w.dp))
+                                Spacer(modifier = Modifier.height(8.w.dp))
                             }
                         }
                     }
@@ -328,6 +319,12 @@ private fun RecentFileCard(
 // 空状态组件
 // ────────────────────────────────────────────────
 
+/**
+ * 空状态占位，显示 CloudOff 图标和提示文字。
+ *
+ * @param hint      提示文字，如「暂无转存记录」
+ * @param cardHeight 卡片高度
+ */
 @Composable
 private fun EmptyState(hint: String, cardHeight: Dp) {
     Box(
@@ -359,13 +356,19 @@ private fun EmptyState(hint: String, cardHeight: Dp) {
 // 单条文件记录
 // ────────────────────────────────────────────────
 
+/**
+ * 单条文件记录行，用于最近浏览和最近转存列表。
+ *
+ * @param item 带父文件夹信息的文件项
+ */
 @Composable
-private fun RecentFileItemRow(item: RecentFileItem) {
-    val iconBg   = if (item.type == FileType.TXT) IconBgBlue else IconBgPink
-    val iconTint = if (item.type == FileType.TXT) IconBlue  else IconPink
-    val icon     = if (item.type == FileType.TXT) Icons.Default.Description
-                   else Icons.Default.OndemandVideo
-    val typeLabel = if (item.type == FileType.TXT) "文档" else "视频"
+private fun RecentFileItemRow(item: RecentFileWithParent) {
+    // 根据文件类型选择图标和颜色
+    val isTxt    = item.file.type == "txt"
+    val iconBg   = if (isTxt) IconBgBlue else IconBgPink
+    val iconTint = if (isTxt) IconBlue  else IconPink
+    val icon     = if (isTxt) Icons.Default.Description else Icons.Default.OndemandVideo
+    val typeLabel = if (isTxt) "文档" else "视频"
 
     Row(
         modifier = Modifier
@@ -398,7 +401,7 @@ private fun RecentFileItemRow(item: RecentFileItem) {
 
             // 第二行：文件名
             Text(
-                text = item.name,
+                text = item.file.name,
                 fontSize = 16.ws.sp,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary,
@@ -411,7 +414,7 @@ private fun RecentFileItemRow(item: RecentFileItem) {
             // 第三行：位置信息 + 箭头
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = formatTimestamp(item.timestamp),
+                    text = formatTimestamp(item.file.lastOpenedAt ?: item.file.lastSavedAt ?: item.file.updatedAt),
                     fontSize = 12.ws.sp,
                     color = TextSecondary,
                     fontWeight = FontWeight.Medium
@@ -430,11 +433,10 @@ private fun RecentFileItemRow(item: RecentFileItem) {
                 Text(
                     text = " | ",
                     fontSize = 12.ws.sp,
-                    color = TextSecondary,
-                    fontWeight = FontWeight.Medium
+                    color = Color(0xFFD1D5DF)
                 )
                 Text(
-                    text = "位置:${item.location}",
+                    text = if (item.hasGrandParent) "位置：...${item.parentName}" else "位置：${item.parentName}",
                     fontSize = 12.ws.sp,
                     color = TextSecondary,
                     fontWeight = FontWeight.Medium,
@@ -479,7 +481,7 @@ private fun formatTimestamp(timestamp: Long): String {
         // 本年内：MM-dd HH:mm
         SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
     } else {
-        // 跨年：yyyy-MM-dd HH:mm
-        SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
+        // 跨年：yyyy-MM-dd（不显示具体时间）
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestamp))
     }
 }
