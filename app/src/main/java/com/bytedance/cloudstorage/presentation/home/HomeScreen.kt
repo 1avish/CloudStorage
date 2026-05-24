@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bytedance.cloudstorage.data.repository.RecentFileWithFolderInfo
+import com.bytedance.cloudstorage.domain.model.FileType
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 import java.text.SimpleDateFormat
@@ -246,7 +248,7 @@ private fun PersonalSpaceCard(
 private fun RecentFileCard(
     title: String,
     emptyHint: String,
-    items: List<RecentFileWithParent>,
+    items: List<RecentFileWithFolderInfo>,
 ) {
     // 折叠状态，默认展开
     var expanded by remember { mutableStateOf(true) }
@@ -362,9 +364,9 @@ private fun EmptyState(hint: String, cardHeight: Dp) {
  * @param item 带父文件夹信息的文件项
  */
 @Composable
-private fun RecentFileItemRow(item: RecentFileWithParent) {
+private fun RecentFileItemRow(item: RecentFileWithFolderInfo) {
     // 根据文件类型选择图标和颜色
-    val isTxt    = item.file.type == "txt"
+    val isTxt    = item.file.type == FileType.Txt
     val iconBg   = if (isTxt) IconBgBlue else IconBgPink
     val iconTint = if (isTxt) IconBlue  else IconPink
     val icon     = if (isTxt) Icons.Default.Description else Icons.Default.OndemandVideo
@@ -375,7 +377,7 @@ private fun RecentFileItemRow(item: RecentFileWithParent) {
             .fillMaxWidth()
             .clickable { /* TODO: 点击跳转到文件详情 */ }
             .padding(vertical = 2.w.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
         // 图标容器
         Box(

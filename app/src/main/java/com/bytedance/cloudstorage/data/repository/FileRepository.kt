@@ -1,13 +1,27 @@
 package com.bytedance.cloudstorage.data.repository
 
 import com.bytedance.cloudstorage.data.local.dao.FileDao
-import com.bytedance.cloudstorage.data.local.entity.FileEntity
-import com.bytedance.cloudstorage.data.mock.MockDataSource
-import kotlinx.coroutines.delay
+import com.bytedance.cloudstorage.data.mapper.FileMapper
+import com.bytedance.cloudstorage.data.remote.datasource.FileRemoteDataSource
+import com.bytedance.cloudstorage.domain.model.CloudFile
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
-/** 文件夹父级信息，供首页展示「位置」字段 */
+/** 文件夹父级信息，供首页「位置」字段展示 */
 data class FolderInfo(
+    val parentName: String,
+    val hasGrandParent: Boolean,
+)
+
+/**
+ * 带父文件夹信息的文件项，供首页最近浏览/转存列表使用。
+ *
+ * 为什么在 Repository 层组装而不是 ViewModel 层：
+ * - 查父文件夹名是数据库查询（suspend fun），放在 ViewModel 的 Flow collect 里会阻塞主线程
+ * - Repository 天然持有 Dao，可以在 map 里直接查，逻辑更内聚
+ */
+data class RecentFileWithFolderInfo(
+    val file: CloudFile,
     val parentName: String,
     val hasGrandParent: Boolean,
 )
@@ -16,49 +30,80 @@ data class FolderInfo(
  * 文件数据仓库（Repository）
  *
  * 职责：
- * - 统一数据访问入口，隔离数据源细节（Room / Mock / 网络）
- * - ViewModel 只调用 Repository，不直接接触 DAO 或网络
+ * - 统一数据访问入口，协调 FileRemoteDataSource（远程）与 FileDao（本地）
+ * - 对外返回 Domain Model（CloudFile），而非 Entity
+ * - 内部完成 DTO → Entity → Domain Model 的全部转换
  *
- * MVP 阶段数据源为 Room + Mock 数据注入，
- * 后续可替换为真实网络请求，上层代码无需修改。
+ * 重要约束：
+ * - 依赖 FileRemoteDataSource 接口，不依赖具体 Mock 实现
+ * - ViewModel 不应直接访问 Dao，只通过本类获取数据
  */
-class FileRepository(private val fileDao: FileDao) {
-
-    /** 最近浏览文件（Flow，数据变更时自动通知） */
-    val recentOpenedFiles: Flow<List<FileEntity>> = fileDao.getRecentOpenedFiles()
-
-    /** 最近转存文件 */
-    val recentSavedFiles: Flow<List<FileEntity>> = fileDao.getRecentSavedFiles()
+class FileRepository(
+    private val fileDao: FileDao,
+    private val remoteDataSource: FileRemoteDataSource,
+) {
 
     /**
-     * 模拟网络请求：从 Mock JSON 注入数据到 Room
+     * 从远程数据源初始化数据（首次启动时写入 Room）
      *
-     * 流程：模拟网络延迟 → 解析 JSON → 写入数据库
-     * 只在数据库为空时执行，避免重复注入。
+     * 流程：remoteDataSource.fetchFiles() → DTO → FileMapper.toEntityList() → insertRoom
      */
-    suspend fun initializeMockDataIfEmpty() {
+    suspend fun initializeDataIfEmpty() {
         val count = fileDao.getFileCount()
         if (count == 0) {
-            // 模拟网络请求延迟
-            delay(MockDataSource.MOCK_NETWORK_DELAY)
-            // 解析 Mock JSON 并写入 Room
-            val files = MockDataSource.parseFiles()
-            fileDao.insertFiles(files)
+            val dtos = remoteDataSource.fetchFiles()
+            val entities = FileMapper.toEntityList(dtos)
+            fileDao.insertFiles(entities)
         }
     }
 
-    /**
-     * 获取存储信息（来自 Mock JSON）
-     *
-     * 真实项目中应从服务器 API 获取，这里直接从 Mock JSON 解析。
-     */
-    fun getStorageInfo(): Pair<Float, Float> {
-        val info = MockDataSource.parseStorageInfo()
+    /** 获取存储空间信息（来自远程数据源） */
+    suspend fun getStorageInfo(): Pair<Float, Float> {
+        val info = remoteDataSource.fetchStorageInfo()
         return info.usedG to info.totalG
     }
 
-    /** 查询文件夹的父级信息（名称 + 是否有祖父文件夹） */
-    suspend fun getFolderInfo(folderId: String): FolderInfo? {
+    /**
+     * 最近浏览文件（带父文件夹信息）
+     *
+     * Room Flow → map 为 CloudFile → 组装 FolderInfo → 推送给 ViewModel。
+     * ViewModel 直接 collect 此 Flow，无需额外数据库查询。
+     */
+    fun observeRecentOpenedWithFolderInfo(): Flow<List<RecentFileWithFolderInfo>> =
+        fileDao.getRecentOpenedFiles().map { entities ->
+            entities.map { entity ->
+                val cloudFile = FileMapper.toDomain(entity)
+                val folderInfo = entity.parentId?.let { getFolderInfo(it) }
+                RecentFileWithFolderInfo(
+                    file = cloudFile,
+                    parentName = folderInfo?.parentName ?: "根目录",
+                    hasGrandParent = folderInfo?.hasGrandParent ?: false,
+                )
+            }
+        }
+
+    /**
+     * 最近转存文件（带父文件夹信息）
+     */
+    fun observeRecentSavedWithFolderInfo(): Flow<List<RecentFileWithFolderInfo>> =
+        fileDao.getRecentSavedFiles().map { entities ->
+            entities.map { entity ->
+                val cloudFile = FileMapper.toDomain(entity)
+                val folderInfo = entity.parentId?.let { getFolderInfo(it) }
+                RecentFileWithFolderInfo(
+                    file = cloudFile,
+                    parentName = folderInfo?.parentName ?: "根目录",
+                    hasGrandParent = folderInfo?.hasGrandParent ?: false,
+                )
+            }
+        }
+
+    /**
+     * 查询文件夹的父级信息
+     *
+     * 仅在 Repository 内部使用，用于组装 RecentFileWithFolderInfo。
+     */
+    private suspend fun getFolderInfo(folderId: String): FolderInfo? {
         val name = fileDao.getFolderNameById(folderId) ?: return null
         val grandParentId = fileDao.getParentIdOfFolder(folderId)
         return FolderInfo(
