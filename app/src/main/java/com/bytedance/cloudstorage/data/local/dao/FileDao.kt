@@ -61,4 +61,31 @@ interface FileDao {
     /** 根据文件夹 ID 查询其父文件夹 ID */
     @Query("SELECT parentId FROM files WHERE fileId = :folderId")
     suspend fun getParentIdOfFolder(folderId: String): String?
+
+    /**
+     * 获取指定文件夹下的所有文件（按类型、更新时间排序）
+     *
+     * @param parentId 父文件夹 ID，null 表示根目录
+     */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND
+              CASE WHEN :parentId IS NULL THEN parentId IS NULL ELSE parentId = :parentId END
+        ORDER BY
+            CASE WHEN type = 'folder' THEN 0 ELSE 1 END,
+            updatedAt DESC
+    """)
+    fun getFilesByParent(parentId: String?): Flow<List<FileEntity>>
+
+    /**
+     * 获取指定类型的所有文件（不分文件夹层级）
+     *
+     * @param type 文件类型字符串（folder / video / txt）
+     */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND type = :type
+        ORDER BY updatedAt DESC
+    """)
+    fun getFilesByType(type: String): Flow<List<FileEntity>>
 }

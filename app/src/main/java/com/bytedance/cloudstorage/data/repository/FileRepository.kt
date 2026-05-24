@@ -111,4 +111,24 @@ class FileRepository(
             hasGrandParent = grandParentId != null,
         )
     }
+
+    /**
+     * 获取指定文件夹下的文件列表（Domain Model）
+     *
+     * @param parentId 父文件夹 ID，null 表示根目录
+     */
+    fun observeFilesByParent(parentId: String?): Flow<List<CloudFile>> =
+        fileDao.getFilesByParent(parentId).map { entities ->
+            FileMapper.toDomainList(entities)
+        }
+
+    /**
+     * 获取指定类型的所有文件（Domain Model）
+     *
+     * @param type 文件类型字符串（folder / video / txt）
+     */
+    fun observeFilesByType(type: String): Flow<List<CloudFile>> =
+        fileDao.getFilesByType(type).map { entities ->
+            FileMapper.toDomainList(entities)
+        }
 }
