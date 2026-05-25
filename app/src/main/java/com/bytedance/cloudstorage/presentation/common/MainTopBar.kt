@@ -1,26 +1,28 @@
-﻿package com.bytedance.cloudstorage.presentation.common
+package com.bytedance.cloudstorage.presentation.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.SwapHorizontalCircle
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +32,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+
+private val BreadcrumbGray = Color(0xFF8C93A4)
+private val BreadcrumbDivider = Color(0xFFD0D3D9)
 
 /**
  * 应用顶部导航栏
@@ -39,51 +45,122 @@ import androidx.compose.ui.unit.sp
  * @param transferTaskCount 传输任务数，大于 0 时显示徽标
  * @param onTransferClick 传输按钮点击回调
  * @param onSearchClick 搜索按钮点击回调
+ * @param hasBack 是否显示返回按钮（在子目录时为 true）
+ * @param onBackClick 返回按钮点击回调
+ * @param currentFolderName 当前文件夹名称，null 时显示 tabs（根目录）
+ * @param pathSegments 面包屑路径分段，空列表 = 根目录（不显示面包屑）
+ * @param onPathClick 点击面包屑第 i 段的回调
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainTopBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
     transferTaskCount: Int = 0,
     onTransferClick: () -> Unit,
-    onSearchClick: () -> Unit
+    onSearchClick: () -> Unit,
+    hasBack: Boolean = false,
+    onBackClick: () -> Unit = {},
+    currentFolderName: String? = null,
+    pathSegments: List<String> = emptyList(),
+    onPathClick: (index: Int) -> Unit = {},
 ) {
-    CenterAlignedTopAppBar(
-        title = {
-            // 居中 Tab 区域
-            TabBar(
-                selectedTab = selectedTab,
-                onTabSelected = onTabSelected
-            )
-        },
-        actions = {
-            // 传输按钮（带任务数徽标）
-            TransferButton(
-                taskCount = transferTaskCount,
-                onClick = onTransferClick
-            )
-            // 搜索按钮
-//            IconButton(onClick = onSearchClick) {
-//                Icon(
-//                    imageVector = Icons.Default.Search,
-//                    contentDescription = "搜索"
-//                )
-//            }
-        },
-        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-            containerColor = Color.White,
-            scrolledContainerColor = Color.White
-        )
-    )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .windowInsetsPadding(WindowInsets.statusBars)
+    ) {
+        Column {
+            // ── 第一行：返回按钮 + 居中 Tabs + 操作按钮 ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 左侧：返回按钮（占 48dp，与 CenterAlignedTopAppBar 的 navigationIcon 占位一致）
+                if (hasBack) {
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                } else {
+                    // 无返回按钮时，用等宽占位保持 tabs 居中
+                    Box(modifier = Modifier.size(48.dp))
+                }
+
+                // 中间：Tabs 或当前文件夹名
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (currentFolderName != null) {
+                        Text(
+                            text = currentFolderName,
+                            fontSize = 22.sp,
+                            letterSpacing = 2.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                    } else {
+                        TabBar(
+                            selectedTab = selectedTab,
+                            onTabSelected = onTabSelected
+                        )
+                    }
+                }
+
+                // 右侧：传输按钮
+                TransferButton(
+                    taskCount = transferTaskCount,
+                    onClick = onTransferClick
+                )
+            }
+
+            // ── 第二行：面包屑路径（仅在子目录时显示） ──
+            if (pathSegments.isNotEmpty()) {
+                // 构建完整路径：根目录 + 进入的文件夹
+                val fullPath = listOf("我的网盘") + pathSegments
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    fullPath.forEachIndexed { index, name ->
+                        if (index > 0) {
+                            Text(
+                                text = " / ",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Normal,
+                                color = BreadcrumbDivider
+                            )
+                        }
+                        val isCurrent = index == fullPath.lastIndex
+                        Text(
+                            text = name,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isCurrent) Color.Black else BreadcrumbGray,
+                            modifier = if (!isCurrent)
+                                Modifier.clickable { onPathClick(index) }
+                            else Modifier
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**
  * 居中 Tab 组件：「网盘」和「文件」两个 Tab。
- *
- * 使用自定义 Row 实现而非 Material TabRow，因为：
- * - TabRow 默认占满整行宽度，这里只需要在 title 区域显示。
- * - 自定义实现更轻量，便于控制样式。
  */
 @Composable
 private fun TabBar(
@@ -124,8 +201,9 @@ private fun TabItem(
     ) {
         Text(
             text = title,
-            fontSize = 20.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            fontSize = 22.sp,
+            letterSpacing = 2.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (isSelected) {
                 MaterialTheme.colorScheme.onSurface
             } else {
@@ -138,9 +216,9 @@ private fun TabItem(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .offset(y = 4.dp)
-                    .size(width = 20.dp, height = 2.dp)
+                    .size(width = 40.dp, height = 2.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(Color(0xFF2979FF))
             )
         }
     }
@@ -163,7 +241,6 @@ private fun TransferButton(
                         containerColor = Color.Red,
                         contentColor = Color.White
                     ) {
-                        // 超过 99 显示 99+
                         Text(text = if (taskCount > 99) "99+" else "$taskCount")
                     }
                 }

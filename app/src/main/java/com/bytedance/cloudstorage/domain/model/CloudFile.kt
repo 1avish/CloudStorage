@@ -1,5 +1,7 @@
 package com.bytedance.cloudstorage.domain.model
 
+import androidx.compose.runtime.Stable
+
 /**
  * 云端文件业务模型（Domain Model）
  *
@@ -10,8 +12,10 @@ package com.bytedance.cloudstorage.domain.model
  * - FileEntity 只关心数据库 Schema（字段名、类型要与 SQLite 表对应）
  * - CloudFile 只关心业务展示（字段名更语义化，type 使用枚举而非 String）
  *
- * Flutter 类比：类似 Dart 里的纯 data class / Freezed model。
+ * @Stable 告知 Compose 编译器：所有字段均为 val 且不可变，
+ * 相同实例引用不会触发 recompose，LazyColumn 滑动复用时收益最大。
  */
+@Stable
 data class CloudFile(
     val id: String,
     val name: String,
