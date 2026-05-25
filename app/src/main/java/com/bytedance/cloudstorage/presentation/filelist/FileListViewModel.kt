@@ -69,6 +69,32 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    // ── 多选状态 ──
+    private val _selectedFileIds = MutableStateFlow<Set<String>>(emptySet())
+    val selectedFileIds: StateFlow<Set<String>> = _selectedFileIds.asStateFlow()
+
+    private val _showActionSheet = MutableStateFlow(false)
+    val showActionSheet: StateFlow<Boolean> = _showActionSheet.asStateFlow()
+
+    /** 当前选中的文件列表（派生自 files + selectedFileIds） */
+    val selectedFiles: StateFlow<List<CloudFile>> = combine(
+        files, _selectedFileIds
+    ) { allFiles, ids ->
+        allFiles.filter { it.id in ids }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 是否处于选择模式（有文件被选中） */
+    val isSelectionMode: StateFlow<Boolean> = _selectedFileIds
+        .map { it.isNotEmpty() }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** 已选中文件数量 */
+    val selectedCount: StateFlow<Int> = _selectedFileIds
+        .map { it.size }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     init {
         val db = AppDatabase.getInstance(application)
         repository = FileRepository(
@@ -88,6 +114,26 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     fun createFolder(name: String) {
         viewModelScope.launch {
             repository.createFolder(name, _currentFolderId.value)
+        }
+    }
+
+    /**
+     * 上传文件：接收系统文件选择器返回的元数据，创建本地数据库记录。
+     *
+     * @param name 文件名（来自 ContentResolver 查询）
+     * @param size 文件大小（字节）
+     * @param uri  content:// URI 字符串
+     * @param type 文件类型键："video" / "txt" / "other"
+     */
+    fun uploadFile(name: String, size: Long, uri: String, type: String) {
+        viewModelScope.launch {
+            repository.uploadFile(
+                name = name,
+                size = size,
+                uri = uri,
+                type = type,
+                parentId = _currentFolderId.value,
+            )
         }
     }
 
@@ -134,5 +180,43 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
             parentId = id
         }
         return parentId
+    }
+
+    // ── 多选与操作 ──
+
+    /** 切换单个文件的选中状态 */
+    fun toggleFileSelection(fileId: String) {
+        val current = _selectedFileIds.value
+        _selectedFileIds.value = if (fileId in current) current - fileId else current + fileId
+    }
+
+    /** 长按进入选中模式（清空旧选中，仅保留当前文件） */
+    fun enterSelectionMode(fileId: String) {
+        _selectedFileIds.value = setOf(fileId)
+    }
+
+    /** 取消全部选中，退出选择模式 */
+    fun exitSelectionMode() {
+        _selectedFileIds.value = emptySet()
+    }
+
+    /** 全选当前目录下所有文件 */
+    fun selectAllFiles() {
+        _selectedFileIds.value = files.value.map { it.id }.toSet()
+    }
+
+    /** 批量删除选中文件 */
+    fun deleteSelectedFiles() {
+        viewModelScope.launch {
+            repository.deleteFiles(_selectedFileIds.value.toList())
+            exitSelectionMode()
+        }
+    }
+
+    /** 重命名文件 */
+    fun renameFile(fileId: String, newName: String) {
+        viewModelScope.launch {
+            repository.renameFile(fileId, newName)
+        }
     }
 }

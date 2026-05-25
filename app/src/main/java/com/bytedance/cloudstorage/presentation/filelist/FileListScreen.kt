@@ -1,13 +1,23 @@
 package com.bytedance.cloudstorage.presentation.filelist
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,37 +27,39 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.OndemandVideo
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.activity.compose.BackHandler
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -59,14 +71,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -115,13 +131,28 @@ fun FileListScreen(
 ) {
     val files by viewModel.files.collectAsStateWithLifecycle()
     val atRoot by viewModel.atRoot.collectAsStateWithLifecycle()
+    val selectedFileIds by viewModel.selectedFileIds.collectAsStateWithLifecycle()
+    val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
+    val selectedFiles by viewModel.selectedFiles.collectAsStateWithLifecycle()
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
     var showCreateSheet by remember { mutableStateOf(false) }
     var showNewFolderSheet by remember { mutableStateOf(false) }
+    var renameTargetFile by remember { mutableStateOf<CloudFile?>(null) }
     val sheetState = rememberModalBottomSheetState()
 
-    // ── 系统返回键：在子目录时返回上一级，否则交由系统处理 ──
-    BackHandler(enabled = !atRoot) {
+    val context = LocalContext.current
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        uploadSelectedFile(context, uri, viewModel)
+    }
+
+    // ── 系统返回键：选择模式下退出选择，否则返回上一级 ──
+    BackHandler(enabled = isSelectionMode) {
+        viewModel.exitSelectionMode()
+    }
+    BackHandler(enabled = !atRoot && !isSelectionMode) {
         viewModel.navigateBack()
     }
 
@@ -181,13 +212,17 @@ fun FileListScreen(
                         .fillMaxSize()
                         .padding(horizontal = 4.w.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        bottom = 96.w.dp
+                        bottom = if (isSelectionMode) 180.w.dp else 96.w.dp
                     )
                 ) {
                     items(files, key = { it.id }, contentType = { it.type.name }) { file ->
                         FileListItem(
                             file = file,
+                            isSelected = file.id in selectedFileIds,
+                            isSelectionMode = isSelectionMode,
                             showDivider = file.id != lastFileId,
+                            onCircleClick = { viewModel.toggleFileSelection(file.id) },
+                            onLongPress = { viewModel.enterSelectionMode(file.id) },
                             onFolderClick = if (file.type == FileType.Folder) { folderId ->
                                 viewModel.navigateIntoFolder(folderId, file.name)
                             } else null
@@ -197,8 +232,9 @@ fun FileListScreen(
             }
         }
 
-        // ── 悬浮按钮：白色圆底 + 黑色加号 ──
-        FloatingActionButton(
+        // ── 悬浮按钮：选择模式下隐藏 ──
+        if (!isSelectionMode) {
+            FloatingActionButton(
             onClick = { showCreateSheet = true },
             shape = CircleShape,
             containerColor = Color.White,
@@ -224,6 +260,38 @@ fun FileListScreen(
                 modifier = Modifier.size(28.w.dp)
             )
         }
+        }
+
+        // ── 选择模式底部操作栏（非模态、不遮挡背景）──
+        if (isSelectionMode) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth(),
+                color = Color.White,
+                shadowElevation = 8.dp,
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            ) {
+                FileActionBar(
+                    selectedFiles = selectedFiles,
+                    onDownload = {
+                        Toast.makeText(context, "下载功能（待实现）", Toast.LENGTH_SHORT).show()
+                    },
+                    onShare = {
+                        Toast.makeText(context, "分享功能（待实现）", Toast.LENGTH_SHORT).show()
+                    },
+                    onDelete = {
+                        viewModel.deleteSelectedFiles()
+                        Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
+                    },
+                    onRename = { file ->
+                        viewModel.exitSelectionMode()
+                        renameTargetFile = file
+                    },
+                    onToggleFile = { fileId -> viewModel.toggleFileSelection(fileId) }
+                )
+            }
+        }
     }
 
     if (showCreateSheet) {
@@ -239,6 +307,14 @@ fun FileListScreen(
                 onNewFolder = {
                     showCreateSheet = false
                     showNewFolderSheet = true
+                },
+                onUploadVideo = {
+                    showCreateSheet = false
+                    filePickerLauncher.launch(arrayOf("video/*"))
+                },
+                onUploadDoc = {
+                    showCreateSheet = false
+                    filePickerLauncher.launch(arrayOf("application/pdf", "text/plain"))
                 }
             )
         }
@@ -261,6 +337,26 @@ fun FileListScreen(
             )
         }
     }
+
+    // ── 重命名弹窗 ──
+    if (renameTargetFile != null) {
+        ModalBottomSheet(
+            onDismissRequest = { renameTargetFile = null },
+            sheetState = sheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            dragHandle = null
+        ) {
+            RenameBottomSheet(
+                file = renameTargetFile!!,
+                onDismiss = { renameTargetFile = null },
+                onConfirm = { newName ->
+                    viewModel.renameFile(renameTargetFile!!.id, newName)
+                    renameTargetFile = null
+                }
+            )
+        }
+    }
 }
 
 // ────────────────────────────────────────────────
@@ -268,7 +364,12 @@ fun FileListScreen(
 // ────────────────────────────────────────────────
 
 @Composable
-private fun BottomSheetContent(onDismiss: () -> Unit, onNewFolder: () -> Unit = {}) {
+private fun BottomSheetContent(
+    onDismiss: () -> Unit,
+    onNewFolder: () -> Unit = {},
+    onUploadVideo: () -> Unit = {},
+    onUploadDoc: () -> Unit = {},
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -390,7 +491,12 @@ private fun BottomSheetContent(onDismiss: () -> Unit, onNewFolder: () -> Unit = 
                         .clip(RoundedCornerShape(12.w.dp))
                         .background(Color(0xFFF5F7FA))
                         .clickable {
-                            if (label == "新建文件夹") onNewFolder() else onDismiss()
+                            when (label) {
+                                "新建文件夹" -> onNewFolder()
+                                "视频" -> onUploadVideo()
+                                "文档" -> onUploadDoc()
+                                else -> onDismiss()
+                            }
                         }
                         .padding(vertical = 18.w.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -556,6 +662,430 @@ private fun NewFolderBottomSheet(onDismiss: () -> Unit, onConfirm: (String) -> U
 }
 
 // ────────────────────────────────────────────────
+// 底部弹窗：文件操作（下载/分享/删除/重命名 + 已选文件横滑列表）
+// ────────────────────────────────────────────────
+
+@Composable
+private fun FileActionBottomSheet(
+    selectedFiles: List<CloudFile>,
+    onDismiss: () -> Unit,
+    onDownload: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+    onRename: (CloudFile) -> Unit,
+    onToggleFile: (String) -> Unit,
+) {
+    val multiSelect = selectedFiles.size > 1
+    val primaryBlue = Color(0xFF3370FF)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(horizontal = 20.w.dp)
+            .padding(bottom = 32.w.dp)
+    ) {
+        // 拖拽手柄
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.w.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 40.w.dp, height = 4.w.dp)
+                    .clip(RoundedCornerShape(2.w.dp))
+                    .background(DividerColor)
+            )
+        }
+
+        // 标题
+        Text(
+            text = "已选择 ${selectedFiles.size} 个文件",
+            fontSize = 20.ws.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            modifier = Modifier.padding(top = 4.w.dp, bottom = 16.w.dp)
+        )
+
+        // ── 已选文件横滑列表 ──
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(10.w.dp),
+            contentPadding = PaddingValues(horizontal = 2.w.dp)
+        ) {
+            items(selectedFiles, key = { it.id }) { file ->
+                SelectedFileChip(
+                    file = file,
+                    onRemove = { onToggleFile(file.id) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.w.dp))
+        HorizontalDivider(color = DividerColor, thickness = 1.w.dp)
+        Spacer(modifier = Modifier.height(20.w.dp))
+
+        // ── 操作按钮行 ──
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ActionButton(
+                icon = Icons.Default.ArrowDownward,
+                label = "下载",
+                iconTint = primaryBlue,
+                bgColor = Color(0xFFEBF0FF),
+                onClick = onDownload
+            )
+            ActionButton(
+                icon = Icons.Default.Share,
+                label = "分享",
+                iconTint = Color(0xFF34C759),
+                bgColor = Color(0xFFE8F8ED),
+                onClick = onShare
+            )
+            ActionButton(
+                icon = Icons.Default.Delete,
+                label = "删除",
+                iconTint = Color(0xFFFF3B30),
+                bgColor = Color(0xFFFFEBEE),
+                onClick = onDelete
+            )
+            ActionButton(
+                icon = Icons.Default.Edit,
+                label = "重命名",
+                iconTint = if (multiSelect) EmptyIconTint else Color(0xFF6366F1),
+                bgColor = if (multiSelect) Color(0xFFF0F2F5) else Color(0xFFF0F5FF),
+                enabled = !multiSelect,
+                onClick = {
+                    if (!multiSelect && selectedFiles.isNotEmpty()) {
+                        onRename(selectedFiles.first())
+                    }
+                }
+            )
+        }
+    }
+}
+
+// ────────────────────────────────────────────────
+// 底部操作栏：非模态版本（选择模式下固定在底部，不遮挡背景）
+// ────────────────────────────────────────────────
+
+@Composable
+private fun FileActionBar(
+    selectedFiles: List<CloudFile>,
+    onDownload: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit,
+    onRename: (CloudFile) -> Unit,
+    onToggleFile: (String) -> Unit,
+) {
+    val multiSelect = selectedFiles.size > 1
+    val primaryBlue = Color(0xFF3370FF)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.w.dp)
+            .padding(top = 12.w.dp, bottom = 24.w.dp)
+    ) {
+        // ── 已选文件横滑列表 ──
+        if (selectedFiles.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.w.dp),
+                contentPadding = PaddingValues(horizontal = 2.w.dp)
+            ) {
+                items(selectedFiles, key = { it.id }) { file ->
+                    SelectedFileChip(
+                        file = file,
+                        onRemove = { onToggleFile(file.id) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.w.dp))
+            HorizontalDivider(color = DividerColor, thickness = 1.w.dp)
+            Spacer(modifier = Modifier.height(16.w.dp))
+        }
+
+        // ── 操作按钮行 ──
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            ActionButton(
+                icon = Icons.Default.ArrowDownward,
+                label = "下载",
+                iconTint = primaryBlue,
+                bgColor = Color(0xFFEBF0FF),
+                onClick = onDownload
+            )
+            ActionButton(
+                icon = Icons.Default.Share,
+                label = "分享",
+                iconTint = Color(0xFF34C759),
+                bgColor = Color(0xFFE8F8ED),
+                onClick = onShare
+            )
+            ActionButton(
+                icon = Icons.Default.Delete,
+                label = "删除",
+                iconTint = Color(0xFFFF3B30),
+                bgColor = Color(0xFFFFEBEE),
+                onClick = onDelete
+            )
+            ActionButton(
+                icon = Icons.Default.Edit,
+                label = "重命名",
+                iconTint = if (multiSelect) EmptyIconTint else Color(0xFF6366F1),
+                bgColor = if (multiSelect) Color(0xFFF0F2F5) else Color(0xFFF0F5FF),
+                enabled = !multiSelect,
+                onClick = {
+                    if (!multiSelect && selectedFiles.isNotEmpty()) {
+                        onRename(selectedFiles.first())
+                    }
+                }
+            )
+        }
+
+        if (multiSelect) {
+            Text(
+                text = "仅支持对单个文件进行重命名",
+                fontSize = 12.ws.sp,
+                color = TextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.w.dp)
+            )
+        }
+    }
+}
+
+// ── 已选文件标签（横滑列表中的每一项） ──
+
+@Composable
+private fun SelectedFileChip(
+    file: CloudFile,
+    onRemove: () -> Unit,
+) {
+    val (icon, _, iconTint) = remember(file.type) { fileStyle(file.type) }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.w.dp))
+            .background(Color(0xFFF5F7FA))
+            .padding(horizontal = 10.w.dp, vertical = 8.w.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier.size(18.w.dp)
+        )
+        Spacer(modifier = Modifier.width(6.w.dp))
+        Text(
+            text = file.name,
+            fontSize = 14.ws.sp,
+            fontWeight = FontWeight.Medium,
+            color = TextPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = 100.w.dp)
+        )
+        Spacer(modifier = Modifier.width(6.w.dp))
+        Box(
+            modifier = Modifier
+                .size(18.w.dp)
+                .clip(CircleShape)
+                .background(EmptyIconTint.copy(alpha = 0.3f))
+                .clickable { onRemove() },
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "取消选择",
+                tint = TextSecondary,
+                modifier = Modifier.size(12.w.dp)
+            )
+        }
+    }
+}
+
+// ── 操作按钮 ──
+
+@Composable
+private fun ActionButton(
+    icon: ImageVector,
+    label: String,
+    iconTint: Color,
+    bgColor: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .alpha(if (enabled) 1f else 0.45f)
+            .clickable(enabled = enabled) { onClick() }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.w.dp)
+                .clip(RoundedCornerShape(14.w.dp))
+                .background(bgColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconTint,
+                modifier = Modifier.size(24.w.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.w.dp))
+        Text(
+            text = label,
+            fontSize = 13.ws.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (enabled) TextPrimary else TextSecondary
+        )
+    }
+}
+
+// ────────────────────────────────────────────────
+// 底部弹窗：重命名文件
+// ────────────────────────────────────────────────
+
+@Composable
+private fun RenameBottomSheet(
+    file: CloudFile,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var fileName by remember { mutableStateOf(file.name) }
+    val focusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(horizontal = 20.w.dp)
+            .padding(bottom = 32.w.dp)
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) { focusManager.clearFocus() }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.w.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 40.w.dp, height = 4.w.dp)
+                    .clip(RoundedCornerShape(2.w.dp))
+                    .background(DividerColor)
+            )
+        }
+
+        Text(
+            text = "重命名",
+            fontSize = 20.ws.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            modifier = Modifier.padding(top = 8.w.dp, bottom = 20.w.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.w.dp)
+                .clip(RoundedCornerShape(8.w.dp))
+                .background(Color(0xFFF5F7FA))
+                .padding(horizontal = 14.w.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            if (fileName.isEmpty()) {
+                Text(
+                    text = "请输入新文件名",
+                    fontSize = 15.ws.sp,
+                    color = TextSecondary
+                )
+            }
+            BasicTextField(
+                value = fileName,
+                onValueChange = { fileName = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontSize = 15.ws.sp,
+                    color = TextPrimary
+                ),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    if (fileName.isNotBlank()) onConfirm(fileName.trim())
+                })
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.w.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.w.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.w.dp)
+                    .clip(RoundedCornerShape(8.w.dp))
+                    .background(Color(0xFFF5F7FA))
+                    .clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "取消",
+                    fontSize = 16.ws.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextSecondary
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.w.dp)
+                    .clip(RoundedCornerShape(8.w.dp))
+                    .background(Color(0xFF3370FF))
+                    .clickable(enabled = fileName.isNotBlank()) {
+                        onConfirm(fileName.trim())
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "确认",
+                    fontSize = 16.ws.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (fileName.isNotBlank()) Color.White
+                    else Color.White.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+}
+
+// ────────────────────────────────────────────────
 // 胶囊分段控件（active = 白底 + 阴影 + 黑色粗体）
 // ────────────────────────────────────────────────
 
@@ -615,8 +1145,17 @@ private fun CapsuleSegmentedControl(
 // ────────────────────────────────────────────────
 
 @Stable
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FileListItem(file: CloudFile, showDivider: Boolean = true, onFolderClick: ((String) -> Unit)? = null) {
+private fun FileListItem(
+    file: CloudFile,
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    showDivider: Boolean = true,
+    onCircleClick: (() -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
+    onFolderClick: ((String) -> Unit)? = null,
+) {
     TrackRecompose(file.id)
     val (icon, iconBg, iconTint) = remember(file.type) { fileStyle(file.type) }
     val formattedSize = remember(file.size, file.type) {
@@ -624,15 +1163,35 @@ private fun FileListItem(file: CloudFile, showDivider: Boolean = true, onFolderC
     }
     val formattedTime = remember(file.updatedAt) { formatTimestamp(file.updatedAt) }
 
+    // 圆圈选中静态样式
+    val circleBg = if (isSelected) Color(0xFF3370FF) else Color.Transparent
+    val circleBorder = if (isSelected) Color(0xFF3370FF) else EmptyIconTint
+    val rowBg = if (isSelected) Color(0xFFEBF0FF) else Color.Transparent
+
     Column(modifier = Modifier.height(74.w.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(72.w.dp)
+                .background(rowBg)
                 .then(
-                    if (file.type == FileType.Folder && onFolderClick != null)
+                    if (isSelectionMode) {
+                        Modifier.clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) { onCircleClick?.invoke() }
+                    } else if (onLongPress != null) {
+                        Modifier.combinedClickable(
+                            onClick = {
+                                if (file.type == FileType.Folder && onFolderClick != null) {
+                                    onFolderClick(file.id)
+                                }
+                            },
+                            onLongClick = { onLongPress() }
+                        )
+                    } else if (file.type == FileType.Folder && onFolderClick != null) {
                         Modifier.clickable { onFolderClick(file.id) }
-                    else Modifier
+                    } else Modifier
                 )
                 .padding(horizontal = 16.w.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -690,18 +1249,35 @@ private fun FileListItem(file: CloudFile, showDivider: Boolean = true, onFolderC
 
             // 右侧圆形选择按钮
             Box(
-                modifier = Modifier.size(40.w.dp, 72.w.dp),
+                modifier = Modifier
+                    .size(40.w.dp, 72.w.dp)
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) { onCircleClick?.invoke() },
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
                         .size(22.w.dp)
                         .border(
-                            width = 1.5f.w.dp,
-                            color = EmptyIconTint,
+                            width = if (isSelected) 0.dp else 1.5f.w.dp,
+                            color = circleBorder,
                             shape = CircleShape
                         )
-                )
+                        .clip(CircleShape)
+                        .background(circleBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "已选中",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.w.dp)
+                        )
+                    }
+                }
             }
         }
 
@@ -776,4 +1352,49 @@ private fun formatFileSize(bytes: Long): String = when {
 private fun formatTimestamp(timestamp: Long): String {
     val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
     return sdf.format(java.util.Date(timestamp))
+}
+
+// ────────────────────────────────────────────────
+// 文件上传辅助函数
+// ────────────────────────────────────────────────
+
+/** MIME 类型 → 文件分类类型键 */
+private fun mimeTypeToFileType(mimeType: String?): String = when {
+    mimeType == null                -> "other"
+    mimeType.startsWith("video/")  -> "video"
+    mimeType.startsWith("text/")   -> "txt"
+    mimeType == "application/pdf"  -> "txt"
+    else                           -> "other"
+}
+
+/**
+ * 从 Content URI 读取文件元数据并写入本地数据库。
+ *
+ * 流程：
+ * 1. ContentResolver.query() 读取 DISPLAY_NAME 和 SIZE
+ * 2. 将数据封装为 FileEntity，通过 ViewModel 存入 Room
+ * 3. 数据库变更自动触发 Room Flow → UI 即时刷新
+ */
+private fun uploadSelectedFile(context: android.content.Context, uri: Uri, viewModel: FileListViewModel) {
+    val contentResolver = context.contentResolver
+    val mimeType = contentResolver.getType(uri)
+    val fileType = mimeTypeToFileType(mimeType)
+    var fileName = "未命名文件"
+    var fileSize = 0L
+
+    contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (nameIndex >= 0) fileName = cursor.getString(nameIndex) ?: fileName
+            if (sizeIndex >= 0) fileSize = cursor.getLong(sizeIndex)
+        }
+    }
+
+    viewModel.uploadFile(
+        name = fileName,
+        size = fileSize,
+        uri = uri.toString(),
+        type = fileType
+    )
 }
