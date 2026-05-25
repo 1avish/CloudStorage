@@ -143,6 +143,7 @@ fun FileListScreen(
     var showCreateSheet by remember { mutableStateOf(false) }
     var showNewFolderSheet by remember { mutableStateOf(false) }
     var renameTargetFile by remember { mutableStateOf<CloudFile?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val sheetState = rememberModalBottomSheetState()
 
@@ -323,8 +324,7 @@ fun FileListScreen(
                         Toast.makeText(context, "分享功能（待实现）", Toast.LENGTH_SHORT).show()
                     },
                     onDelete = {
-                        viewModel.deleteSelectedFiles()
-                        Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
+                        showDeleteConfirm = true
                     },
                     onRename = { file ->
                         viewModel.exitSelectionMode()
@@ -395,6 +395,27 @@ fun FileListScreen(
                 onConfirm = { newName ->
                     viewModel.renameFile(renameTargetFile!!.id, newName)
                     renameTargetFile = null
+                }
+            )
+        }
+    }
+
+    // ── 删除确认弹窗 ──
+    if (showDeleteConfirm) {
+        ModalBottomSheet(
+            onDismissRequest = { showDeleteConfirm = false },
+            sheetState = sheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            dragHandle = null
+        ) {
+            DeleteConfirmBottomSheet(
+                count = selectedFiles.size,
+                onDismiss = { showDeleteConfirm = false },
+                onConfirm = {
+                    viewModel.deleteSelectedFiles()
+                    showDeleteConfirm = false
+                    Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
                 }
             )
         }
@@ -889,18 +910,6 @@ private fun FileActionBar(
                 }
             )
         }
-
-        if (multiSelect) {
-            Text(
-                text = "仅支持对单个文件进行重命名",
-                fontSize = 12.ws.sp,
-                color = TextSecondary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.w.dp)
-            )
-        }
     }
 }
 
@@ -1121,6 +1130,119 @@ private fun RenameBottomSheet(
                     fontWeight = FontWeight.Medium,
                     color = if (fileName.isNotBlank()) Color.White
                     else Color.White.copy(alpha = 0.5f)
+                )
+            }
+        }
+    }
+}
+
+// ────────────────────────────────────────────────
+// 底部弹窗：删除确认
+// ────────────────────────────────────────────────
+
+@Composable
+private fun DeleteConfirmBottomSheet(
+    count: Int,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(horizontal = 20.w.dp)
+            .padding(bottom = 32.w.dp)
+    ) {
+        // 拖拽手柄
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.w.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 40.w.dp, height = 4.w.dp)
+                    .clip(RoundedCornerShape(2.w.dp))
+                    .background(DividerColor)
+            )
+        }
+
+        // 警告图标
+        Box(
+            modifier = Modifier
+                .padding(top = 12.w.dp, bottom = 8.w.dp)
+                .size(48.w.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFFEBEE))
+                .align(Alignment.CenterHorizontally),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = null,
+                tint = Color(0xFFFF3B30),
+                modifier = Modifier.size(26.w.dp)
+            )
+        }
+
+        // 标题
+        Text(
+            text = "确认删除",
+            fontSize = 20.ws.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(top = 8.w.dp, bottom = 6.w.dp)
+        )
+
+        // 描述
+        Text(
+            text = "将删除 $count 个文件，删除后无法恢复",
+            fontSize = 14.ws.sp,
+            color = TextSecondary,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .padding(bottom = 24.w.dp)
+        )
+
+        // 按钮行
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.w.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.w.dp)
+                    .clip(RoundedCornerShape(8.w.dp))
+                    .background(Color(0xFFF5F7FA))
+                    .clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "取消",
+                    fontSize = 16.ws.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextSecondary
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.w.dp)
+                    .clip(RoundedCornerShape(8.w.dp))
+                    .background(Color(0xFFFF3B30))
+                    .clickable { onConfirm() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "删除",
+                    fontSize = 16.ws.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
                 )
             }
         }
