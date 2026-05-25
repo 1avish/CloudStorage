@@ -113,4 +113,12 @@ interface FileDao {
         LIMIT 1
     """)
     suspend fun findFolderIdByName(name: String, parentId: String?): String?
+
+    /** 批量逻辑删除文件 */
+    @Query("UPDATE files SET isDeleted = 1 WHERE fileId IN (:ids)")
+    suspend fun deleteFiles(ids: List<String>)
+
+    /** 重命名文件 */
+    @Query("UPDATE files SET name = :newName, updatedAt = :now WHERE fileId = :fileId")
+    suspend fun renameFile(fileId: String, newName: String, now: Long)
 }

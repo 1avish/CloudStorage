@@ -50,6 +50,10 @@ private val BreadcrumbDivider = Color(0xFFD0D3D9)
  * @param currentFolderName 当前文件夹名称，null 时显示 tabs（根目录）
  * @param pathSegments 面包屑路径分段，空列表 = 根目录（不显示面包屑）
  * @param onPathClick 点击面包屑第 i 段的回调
+ * @param isSelectionMode 是否处于文件选择模式
+ * @param selectedCount 已选中文件数量
+ * @param onCancelSelection 取消选择按钮回调
+ * @param onSelectAll 全选按钮回调
  */
 @Composable
 fun MainTopBar(
@@ -63,6 +67,10 @@ fun MainTopBar(
     currentFolderName: String? = null,
     pathSegments: List<String> = emptyList(),
     onPathClick: (index: Int) -> Unit = {},
+    isSelectionMode: Boolean = false,
+    selectedCount: Int = 0,
+    onCancelSelection: () -> Unit = {},
+    onSelectAll: () -> Unit = {},
 ) {
     Box(
         modifier = Modifier
@@ -70,7 +78,43 @@ fun MainTopBar(
             .background(Color.White)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
-        Column {
+        if (isSelectionMode) {
+            // ── 选择模式：取消 | 已选中 N 个文件 | 全选 ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "取消",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = Color(0xFF3370FF),
+                    modifier = Modifier.clickable { onCancelSelection() }
+                )
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "已选中 $selectedCount 个文件",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+                Text(
+                    text = "全选",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = Color(0xFF3370FF),
+                    modifier = Modifier.clickable { onSelectAll() }
+                )
+            }
+        } else {
+            Column {
             // ── 第一行：返回按钮 + 居中 Tabs + 操作按钮 ──
             Row(
                 modifier = Modifier
@@ -155,6 +199,7 @@ fun MainTopBar(
                     }
                 }
             }
+        }
         }
     }
 }

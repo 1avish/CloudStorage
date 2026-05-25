@@ -43,6 +43,8 @@ class MainActivity : ComponentActivity() {
                 val hasBack by fileListViewModel.hasBack.collectAsStateWithLifecycle()
                 val pathStack by fileListViewModel.pathStack.collectAsStateWithLifecycle()
                 val currentFolderName by fileListViewModel.currentFolderName.collectAsStateWithLifecycle()
+                val isSelectionMode by fileListViewModel.isSelectionMode.collectAsStateWithLifecycle()
+                val selectedCount by fileListViewModel.selectedCount.collectAsStateWithLifecycle()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -65,13 +67,17 @@ class MainActivity : ComponentActivity() {
                             onBackClick = { fileListViewModel.navigateBack() },
                             currentFolderName = currentFolderName,
                             pathSegments = pathStack,
-                            onPathClick = { index -> fileListViewModel.navigateToPathIndex(index) }
+                            onPathClick = { index -> fileListViewModel.navigateToPathIndex(index) },
+                            isSelectionMode = isSelectionMode,
+                            selectedCount = selectedCount,
+                            onCancelSelection = { fileListViewModel.exitSelectionMode() },
+                            onSelectAll = { fileListViewModel.selectAllFiles() }
                         )
                     }
                 ) { innerPadding ->
                     HorizontalPager(
                         state = pagerState,
-                        userScrollEnabled = !hasBack,
+                        userScrollEnabled = !hasBack && !isSelectionMode,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)

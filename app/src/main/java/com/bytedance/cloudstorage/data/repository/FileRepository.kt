@@ -173,4 +173,45 @@ class FileRepository(
         fileDao.insertFiles(listOf(entity))
         return id
     }
+
+    /**
+     * 上传文件：将系统文件选择器返回的文件元数据写入本地数据库。
+     *
+     * @param name 文件名（由 ContentResolver 查询得到）
+     * @param size 文件大小（字节）
+     * @param uri  content:// URI 字符串
+     * @param type 文件类型键："video" / "txt" / "other"
+     * @param parentId 存储位置的父文件夹 ID，null 表示根目录
+     */
+    suspend fun uploadFile(
+        name: String,
+        size: Long,
+        uri: String,
+        type: String,
+        parentId: String?,
+    ) {
+        val id = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        val entity = FileEntity(
+            fileId = id,
+            name = name,
+            size = size,
+            uri = uri,
+            type = type,
+            parentId = parentId,
+            createdAt = now,
+            updatedAt = now,
+        )
+        fileDao.insertFiles(listOf(entity))
+    }
+
+    /** 批量逻辑删除文件 */
+    suspend fun deleteFiles(ids: List<String>) {
+        fileDao.deleteFiles(ids)
+    }
+
+    /** 重命名文件 */
+    suspend fun renameFile(fileId: String, newName: String) {
+        fileDao.renameFile(fileId, newName, System.currentTimeMillis())
+    }
 }
