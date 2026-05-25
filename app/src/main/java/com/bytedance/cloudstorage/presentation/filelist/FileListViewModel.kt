@@ -19,10 +19,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class SortType { TIME, NAME }
+enum class SortDirection { ASC, DESC }
+
 /**
  * 文件列表 ViewModel
  *
- * 管理当前文件夹路径和筛选类型，驱动 Repository 的 Flow 查询。
+ * 管理当前文件夹路径、筛选类型和排序方式，驱动 Repository 的 Flow 查询。
  */
 class FileListViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -33,6 +36,13 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
 
     // ── 胶囊筛选类型：null = 全部，"folder"/"video"/"txt" ──
     private val _filterType = MutableStateFlow<String?>(null)
+
+    // ── 排序状态 ──
+    private val _sortType = MutableStateFlow(SortType.TIME)
+    val sortType: StateFlow<SortType> = _sortType.asStateFlow()
+
+    private val _sortDirection = MutableStateFlow(SortDirection.DESC)
+    val sortDirection: StateFlow<SortDirection> = _sortDirection.asStateFlow()
 
     // ── 路径面包屑（从根到当前文件夹的名称列表） ──
     private val _pathStack = MutableStateFlow<List<String>>(emptyList())
@@ -54,17 +64,20 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    // ── 文件列表：始终在当前目录下筛选 ──
+    // ── 文件列表：始终在当前目录下筛选并排序 ──
     @OptIn(ExperimentalCoroutinesApi::class)
     val files: StateFlow<List<CloudFile>> = combine(
-        _currentFolderId, _filterType
-    ) { folderId, type -> folderId to type }
-        .flatMapLatest { (folderId, type) ->
-            if (type == null) {
-                repository.observeFilesByParent(folderId)
+        _currentFolderId, _filterType, _sortType, _sortDirection
+    ) { folderId, type, sortType, sortDir ->
+        FileQuery(folderId, type, sortType, sortDir)
+    }
+        .flatMapLatest { query ->
+            val flow = if (query.filterType == null) {
+                repository.observeFilesByParent(query.folderId)
             } else {
-                repository.observeFilesByParentAndType(folderId, type)
+                repository.observeFilesByParentAndType(query.folderId, query.filterType)
             }
+            flow.map { files -> sortFiles(files, query.sortType, query.sortDir) }
         }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -108,6 +121,19 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
 
     fun setFilter(type: String?) {
         _filterType.value = type
+    }
+
+    /** 切换排序：同类型则颠倒方向，不同类型则切换并设默认方向 */
+    fun toggleSort(type: SortType) {
+        if (_sortType.value == type) {
+            _sortDirection.value = if (_sortDirection.value == SortDirection.ASC) SortDirection.DESC else SortDirection.ASC
+        } else {
+            _sortType.value = type
+            _sortDirection.value = when (type) {
+                SortType.TIME -> SortDirection.DESC
+                SortType.NAME -> SortDirection.ASC
+            }
+        }
     }
 
     /** 创建新文件夹（在当前目录下） */
@@ -218,5 +244,22 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             repository.renameFile(fileId, newName)
         }
+    }
+
+    // ── 内部类型与方法 ──
+
+    private data class FileQuery(
+        val folderId: String?,
+        val filterType: String?,
+        val sortType: SortType,
+        val sortDir: SortDirection,
+    )
+
+    private fun sortFiles(files: List<CloudFile>, type: SortType, direction: SortDirection): List<CloudFile> {
+        val comparator: Comparator<CloudFile> = when (type) {
+            SortType.TIME -> compareBy { it.updatedAt }
+            SortType.NAME -> compareBy { it.name.lowercase() }
+        }
+        return if (direction == SortDirection.DESC) files.sortedWith(comparator.reversed()) else files.sortedWith(comparator)
     }
 }

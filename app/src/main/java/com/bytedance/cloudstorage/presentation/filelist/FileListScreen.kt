@@ -53,6 +53,8 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -64,6 +66,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -144,7 +147,12 @@ fun FileListScreen(
     var showNewFolderSheet by remember { mutableStateOf(false) }
     var renameTargetFile by remember { mutableStateOf<CloudFile?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    val listState = rememberLazyListState()
+    var showSortMenu by remember { mutableStateOf(false) }
+    val sortType by viewModel.sortType.collectAsStateWithLifecycle()
+    val sortDirection by viewModel.sortDirection.collectAsStateWithLifecycle()
+    val fileOrderKey = remember(files) {
+        files.joinToString(separator = "|") { it.id }
+    }
     val sheetState = rememberModalBottomSheetState()
 
     val context = LocalContext.current
@@ -161,11 +169,6 @@ fun FileListScreen(
     }
     BackHandler(enabled = !atRoot && !isSelectionMode) {
         viewModel.navigateBack()
-    }
-
-    // ── 切换筛选时回到列表顶端 ──
-    LaunchedEffect(selectedFilterIndex) {
-        listState.scrollToItem(0)
     }
 
     // ── 性能监测（测试完连同 FileListPerfMonitor 一起删除）──
@@ -194,23 +197,62 @@ fun FileListScreen(
             )
 
             // ── 排序栏 ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.w.dp, vertical = 4.w.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "按综合排序",
-                    fontSize = 13.ws.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = TextSecondary
-                )
-                Text(
-                    text = " ↓",
-                    fontSize = 10.ws.sp,
-                    color = TextSecondary
-                )
+            Box {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.w.dp, vertical = 4.w.dp)
+                        .clickable { showSortMenu = true },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val label = when (sortType) {
+                        SortType.TIME -> "按修改时间"
+                        SortType.NAME -> "按文件名"
+                    }
+                    val arrow = if (sortDirection == SortDirection.DESC) " ↓" else " ↑"
+                    Text(
+                        text = label,
+                        fontSize = 13.ws.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextSecondary
+                    )
+                    Text(
+                        text = arrow,
+                        fontSize = 10.ws.sp,
+                        color = TextSecondary
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = showSortMenu,
+                    onDismissRequest = { showSortMenu = false },
+                    containerColor = Color.White
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("按修改时间") },
+                        onClick = {
+                            viewModel.toggleSort(SortType.TIME)
+                            showSortMenu = false
+                        },
+                        trailingIcon = {
+                            if (sortType == SortType.TIME) {
+                                Text(if (sortDirection == SortDirection.DESC) "↓" else "↑")
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("按文件名") },
+                        onClick = {
+                            viewModel.toggleSort(SortType.NAME)
+                            showSortMenu = false
+                        },
+                        trailingIcon = {
+                            if (sortType == SortType.NAME) {
+                                Text(if (sortDirection == SortDirection.DESC) "↓" else "↑")
+                            }
+                        }
+                    )
+                }
             }
 
             // ── 文件列表 / 空状态 ──
@@ -219,27 +261,30 @@ fun FileListScreen(
             } else {
                 // lastFileId 在 items 块外计算，避免 lambda 捕获 files 列表
                 val lastFileId = files.last().id
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 4.w.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                        bottom = if (isSelectionMode) 180.w.dp else 96.w.dp
-                    )
-                ) {
-                    items(files, key = { it.id }, contentType = { it.type.name }) { file ->
-                        FileListItem(
-                            file = file,
-                            isSelected = file.id in selectedFileIds,
-                            isSelectionMode = isSelectionMode,
-                            showDivider = file.id != lastFileId,
-                            onCircleClick = { viewModel.toggleFileSelection(file.id) },
-                            onLongPress = { viewModel.enterSelectionMode(file.id) },
-                            onFolderClick = if (file.type == FileType.Folder) { folderId ->
-                                viewModel.navigateIntoFolder(folderId, file.name)
-                            } else null
+                key(selectedFilterIndex, sortType, sortDirection, fileOrderKey) {
+                    val listState = rememberLazyListState()
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 4.w.dp),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                            bottom = if (isSelectionMode) 180.w.dp else 96.w.dp
                         )
+                    ) {
+                        items(files, contentType = { it.type.name }) { file ->
+                            FileListItem(
+                                file = file,
+                                isSelected = file.id in selectedFileIds,
+                                isSelectionMode = isSelectionMode,
+                                showDivider = file.id != lastFileId,
+                                onCircleClick = { viewModel.toggleFileSelection(file.id) },
+                                onLongPress = { viewModel.enterSelectionMode(file.id) },
+                                onFolderClick = if (file.type == FileType.Folder) { folderId ->
+                                    viewModel.navigateIntoFolder(folderId, file.name)
+                                } else null
+                            )
+                        }
                     }
                 }
             }
