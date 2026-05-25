@@ -6,7 +6,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -52,8 +53,6 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
@@ -76,9 +75,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -96,7 +99,9 @@ import com.bytedance.cloudstorage.utils.ws
 // ────────────────────────────────────────────────
 // 颜色常量，严格对齐设计稿 App.tsx
 // ────────────────────────────────────────────────
-private val BgGray           = Color(0xFFF8F9FA)
+private val BgGray           = Color.White
+private val PrimaryBlue      = Color(0xFF3370FF)
+private val PrimaryBlueBg    = Color(0xFFEBF0FF)
 private val CapsuleBg        = Color(0xFFEBEDF0)
 private val TextPrimary      = Color(0xFF1D2129)
 private val TextSecondary    = Color(0xFF8C93A4)
@@ -138,6 +143,7 @@ fun FileListScreen(
     var showCreateSheet by remember { mutableStateOf(false) }
     var showNewFolderSheet by remember { mutableStateOf(false) }
     var renameTargetFile by remember { mutableStateOf<CloudFile?>(null) }
+    val listState = rememberLazyListState()
     val sheetState = rememberModalBottomSheetState()
 
     val context = LocalContext.current
@@ -154,6 +160,11 @@ fun FileListScreen(
     }
     BackHandler(enabled = !atRoot && !isSelectionMode) {
         viewModel.navigateBack()
+    }
+
+    // ── 切换筛选时回到列表顶端 ──
+    LaunchedEffect(selectedFilterIndex) {
+        listState.scrollToItem(0)
     }
 
     // ── 性能监测（测试完连同 FileListPerfMonitor 一起删除）──
@@ -208,6 +219,7 @@ fun FileListScreen(
                 // lastFileId 在 items 块外计算，避免 lambda 捕获 files 列表
                 val lastFileId = files.last().id
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 4.w.dp),
@@ -234,32 +246,62 @@ fun FileListScreen(
 
         // ── 悬浮按钮：选择模式下隐藏 ──
         if (!isSelectionMode) {
-            FloatingActionButton(
-            onClick = { showCreateSheet = true },
-            shape = CircleShape,
-            containerColor = Color.White,
-            contentColor = TextPrimary,
-            elevation = FloatingActionButtonDefaults.elevation(
-                defaultElevation = 0.dp,
-                pressedElevation = 0.dp
-            ),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = (-24).w.dp, y = (-48).w.dp)
-                .size(56.w.dp)
-                .shadow(
-                    elevation = 16.dp,
-                    shape = CircleShape,
-                    ambientColor = Color.Black.copy(alpha = 0.12f),
-                    spotColor = Color.Black.copy(alpha = 0.12f)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = (-24).w.dp, y = (-48).w.dp)
+                    .size(56.w.dp)
+                    .shadow(
+                        elevation = 12.dp,
+                        shape = CircleShape,
+                        ambientColor = PrimaryBlue.copy(alpha = 0.3f),
+                        spotColor = PrimaryBlue.copy(alpha = 0.25f)
+                    )
+                    .clip(CircleShape)
+                    .clickable { showCreateSheet = true },
+                contentAlignment = Alignment.Center
+            ) {
+                // 底层：斜向渐变
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.linearGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color(0xFF7AAEFF),
+                                    0.33f to Color(0xFF3B82F6),
+                                    0.66f to Color(0xFF3B82F6),
+                                    1.0f to Color(0xFF7AAEFF)
+                                ),
+                                start = Offset(0f, Float.POSITIVE_INFINITY),
+                                end = Offset(Float.POSITIVE_INFINITY, 0f)
+                            )
+                        )
                 )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "创建文件夹",
-                modifier = Modifier.size(28.w.dp)
-            )
-        }
+                // 光泽层：左上角径向高光
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.35f),
+                                    Color.Yellow.copy(alpha = 0.08f),
+                                    Color.Transparent
+                                ),
+                                center = Offset(15f, 15f),
+                                radius = 56f
+                            )
+                        )
+                )
+                // 图标
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "创建文件夹",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.w.dp)
+                )
+            }
         }
 
         // ── 选择模式底部操作栏（非模态、不遮挡背景）──
@@ -1086,7 +1128,7 @@ private fun RenameBottomSheet(
 }
 
 // ────────────────────────────────────────────────
-// 胶囊分段控件（active = 白底 + 阴影 + 黑色粗体）
+// 胶囊分段控件（滑动指示器 + 无波纹）
 // ────────────────────────────────────────────────
 
 @Composable
@@ -1096,36 +1138,49 @@ private fun CapsuleSegmentedControl(
     modifier: Modifier = Modifier
 ) {
     val filters = FileFilter.entries
+    var totalWidth by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
 
     Box(
         modifier = modifier
-            .height(32.w.dp)
+            .height(40.w.dp)
             .clip(RoundedCornerShape(50))
             .background(CapsuleBg)
-            .padding(1.w.dp)
+            .padding(4.w.dp)
+            .onSizeChanged { totalWidth = it.width }
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        if (totalWidth > 0) {
+            val itemWidthDp = with(density) { totalWidth.toDp() } / filters.size
+            val indicatorOffset by animateDpAsState(
+                targetValue = itemWidthDp * selectedIndex,
+                animationSpec = tween(durationMillis = 300),
+                label = "capsuleSlide"
+            )
+
+            // 滑动指示器白球
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .size(itemWidthDp, 32.w.dp)
+                    .padding(horizontal = 2.w.dp)
+                    .shadow(2.dp, RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White)
+            )
+        }
+
+        // 文字层
+        Row(modifier = Modifier.fillMaxSize().padding(vertical = 4.w.dp)) {
             filters.forEachIndexed { index, filter ->
                 val isSelected = index == selectedIndex
-
-                val bgColor by animateColorAsState(
-                    targetValue = if (isSelected) Color.White else Color.Transparent,
-                    animationSpec = tween(durationMillis = 200),
-                    label = "capsuleBg"
-                )
-
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxSize()
-                        .padding(2.w.dp)
-                        .shadow(
-                            elevation = if (isSelected) 2.dp else 0.dp,
-                            shape = RoundedCornerShape(50)
-                        )
-                        .clip(RoundedCornerShape(50))
-                        .background(bgColor)
-                        .clickable { onSelected(index) },
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) { onSelected(index) },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
