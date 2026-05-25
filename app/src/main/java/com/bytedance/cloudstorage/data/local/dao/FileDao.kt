@@ -88,4 +88,29 @@ interface FileDao {
         ORDER BY updatedAt DESC
     """)
     fun getFilesByType(type: String): Flow<List<FileEntity>>
+
+    /**
+     * 获取指定文件夹下、指定类型的所有文件（含子文件夹）
+     *
+     * @param parentId 父文件夹 ID，null 表示根目录
+     * @param type 文件类型字符串（folder / video / txt）
+     */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND type = :type
+              AND CASE WHEN :parentId IS NULL THEN parentId IS NULL ELSE parentId = :parentId END
+        ORDER BY updatedAt DESC
+    """)
+    fun getFilesByParentAndType(parentId: String?, type: String): Flow<List<FileEntity>>
+
+    /**
+     * 根据文件夹名称和父级 ID 查找文件夹 fileId（供面包屑导航反查使用）
+     */
+    @Query("""
+        SELECT fileId FROM files
+        WHERE isDeleted = 0 AND type = 'folder' AND name = :name
+              AND CASE WHEN :parentId IS NULL THEN parentId IS NULL ELSE parentId = :parentId END
+        LIMIT 1
+    """)
+    suspend fun findFolderIdByName(name: String, parentId: String?): String?
 }

@@ -1,6 +1,7 @@
 package com.bytedance.cloudstorage.data.repository
 
 import com.bytedance.cloudstorage.data.local.dao.FileDao
+import com.bytedance.cloudstorage.data.local.entity.FileEntity
 import com.bytedance.cloudstorage.data.mapper.FileMapper
 import com.bytedance.cloudstorage.data.remote.datasource.FileRemoteDataSource
 import com.bytedance.cloudstorage.domain.model.CloudFile
@@ -131,4 +132,45 @@ class FileRepository(
         fileDao.getFilesByType(type).map { entities ->
             FileMapper.toDomainList(entities)
         }
+
+    /**
+     * 获取指定文件夹下、指定类型的所有文件（Domain Model）
+     *
+     * @param parentId 父文件夹 ID，null 表示根目录
+     * @param type 文件类型字符串（folder / video / txt）
+     */
+    fun observeFilesByParentAndType(parentId: String?, type: String): Flow<List<CloudFile>> =
+        fileDao.getFilesByParentAndType(parentId, type).map { entities ->
+            FileMapper.toDomainList(entities)
+        }
+
+    /**
+     * 根据文件夹名称和父级 ID 查找文件夹 ID（供面包屑导航反查使用）
+     */
+    suspend fun findFolderIdByName(name: String, parentId: String?): String? =
+        fileDao.findFolderIdByName(name, parentId)
+
+    /**
+     * 创建新文件夹
+     *
+     * @param name 文件夹名称
+     * @param parentId 父文件夹 ID，null 表示根目录
+     * @return 新建文件夹的 ID
+     */
+    suspend fun createFolder(name: String, parentId: String?): String {
+        val id = java.util.UUID.randomUUID().toString()
+        val now = System.currentTimeMillis()
+        val entity = FileEntity(
+            fileId = id,
+            name = name,
+            size = 0L,
+            uri = null,
+            type = "folder",
+            parentId = parentId,
+            createdAt = now,
+            updatedAt = now,
+        )
+        fileDao.insertFiles(listOf(entity))
+        return id
+    }
 }

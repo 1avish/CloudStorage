@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -33,7 +34,27 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     // ── 胶囊筛选类型：null = 全部，"folder"/"video"/"txt" ──
     private val _filterType = MutableStateFlow<String?>(null)
 
-    // ── 文件列表（folderId 或 filterType 任一变化时自动重新查询） ──
+    // ── 路径面包屑（从根到当前文件夹的名称列表） ──
+    private val _pathStack = MutableStateFlow<List<String>>(emptyList())
+    val pathStack: StateFlow<List<String>> = _pathStack.asStateFlow()
+
+    val atRoot: StateFlow<Boolean> = _pathStack
+        .map { it.isEmpty() }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
+
+    val hasBack: StateFlow<Boolean> = _pathStack
+        .map { it.isNotEmpty() }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** 当前文件夹名称，null = 根目录（显示"我的网盘"） */
+    val currentFolderName: StateFlow<String?> = _pathStack
+        .map { stack -> stack.lastOrNull() }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    // ── 文件列表：始终在当前目录下筛选 ──
     @OptIn(ExperimentalCoroutinesApi::class)
     val files: StateFlow<List<CloudFile>> = combine(
         _currentFolderId, _filterType
@@ -42,7 +63,7 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
             if (type == null) {
                 repository.observeFilesByParent(folderId)
             } else {
-                repository.observeFilesByType(type)
+                repository.observeFilesByParentAndType(folderId, type)
             }
         }
         .distinctUntilChanged()
@@ -63,8 +84,55 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         _filterType.value = type
     }
 
+    /** 创建新文件夹（在当前目录下） */
+    fun createFolder(name: String) {
+        viewModelScope.launch {
+            repository.createFolder(name, _currentFolderId.value)
+        }
+    }
+
     fun navigateToFolder(folderId: String?) {
         _currentFolderId.value = folderId
         _filterType.value = null
+    }
+
+    /** 进入子文件夹 */
+    fun navigateIntoFolder(folderId: String, folderName: String) {
+        _pathStack.value = _pathStack.value + folderName
+        _currentFolderId.value = folderId
+        _filterType.value = null
+    }
+
+    /** 返回上一级目录 */
+    fun navigateBack() {
+        val stack = _pathStack.value
+        if (stack.isEmpty()) return
+        navigateToPathIndex(stack.size - 1)
+    }
+
+    /** 跳转到面包屑指定层级（index = 0 表示根目录） */
+    fun navigateToPathIndex(index: Int) {
+        val stack = _pathStack.value
+        if (index >= stack.size) return
+        val newStack = stack.take(index)
+        _pathStack.value = newStack
+        viewModelScope.launch {
+            if (newStack.isEmpty()) {
+                _currentFolderId.value = null
+            } else {
+                _currentFolderId.value = findFolderIdByPath(newStack)
+            }
+        }
+        _filterType.value = null
+    }
+
+    /** 根据路径名称栈，逐级查找文件夹 ID */
+    private suspend fun findFolderIdByPath(pathNames: List<String>): String? {
+        var parentId: String? = null
+        for (name in pathNames) {
+            val id = repository.findFolderIdByName(name, parentId) ?: return null
+            parentId = id
+        }
+        return parentId
     }
 }

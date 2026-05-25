@@ -10,11 +10,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bytedance.cloudstorage.presentation.common.MainTopBar
 import com.bytedance.cloudstorage.presentation.filelist.FileListScreen
+import com.bytedance.cloudstorage.presentation.filelist.FileListViewModel
 import com.bytedance.cloudstorage.presentation.home.HomeScreen
 import com.bytedance.cloudstorage.ui.theme.CloudStorageTheme
 import com.bytedance.cloudstorage.utils.ScreenUtils
@@ -32,8 +36,13 @@ class MainActivity : ComponentActivity() {
             CloudStorageTheme {
                 val context = LocalContext.current
                 val coroutineScope = rememberCoroutineScope()
+                val fileListViewModel: FileListViewModel = viewModel()
 
                 val pagerState = rememberPagerState(pageCount = { 2 })
+
+                val hasBack by fileListViewModel.hasBack.collectAsStateWithLifecycle()
+                val pathStack by fileListViewModel.pathStack.collectAsStateWithLifecycle()
+                val currentFolderName by fileListViewModel.currentFolderName.collectAsStateWithLifecycle()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -51,20 +60,25 @@ class MainActivity : ComponentActivity() {
                             },
                             onSearchClick = {
                                 Toast.makeText(context, "搜索（待实现）", Toast.LENGTH_SHORT).show()
-                            }
+                            },
+                            hasBack = hasBack,
+                            onBackClick = { fileListViewModel.navigateBack() },
+                            currentFolderName = currentFolderName,
+                            pathSegments = pathStack,
+                            onPathClick = { index -> fileListViewModel.navigateToPathIndex(index) }
                         )
                     }
                 ) { innerPadding ->
                     HorizontalPager(
                         state = pagerState,
+                        userScrollEnabled = !hasBack,
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) { page ->
                         when (page) {
-                            // HomeScreen 内部自行创建 ViewModel 并加载数据
                             0 -> HomeScreen()
-                            1 -> FileListScreen()
+                            1 -> FileListScreen(viewModel = fileListViewModel)
                         }
                     }
                 }
