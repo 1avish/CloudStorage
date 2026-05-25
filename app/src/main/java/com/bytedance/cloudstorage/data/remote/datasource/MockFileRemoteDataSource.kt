@@ -2,8 +2,6 @@ package com.bytedance.cloudstorage.data.remote.datasource
 
 import com.bytedance.cloudstorage.data.remote.dto.FileDto
 import com.bytedance.cloudstorage.data.remote.dto.StorageInfoDto
-import org.json.JSONObject
-import java.util.Calendar
 
 /**
  * Mock 远程数据源，模拟服务端接口返回。
@@ -35,151 +33,67 @@ class MockFileRemoteDataSource : FileRemoteDataSource {
     // ────────────────────────────────────────────
 
     private fun parseStorageInfo(): StorageInfoDto {
-        val json = JSONObject(MOCK_JSON)
-        val storage = json.getJSONObject("storage")
-        return StorageInfoDto(
-            usedG = storage.getDouble("usedG").toFloat(),
-            totalG = storage.getDouble("totalG").toFloat(),
-        )
+        return StorageInfoDto(usedG = 4.9f, totalG = 10.0f)
     }
 
     private fun parseFiles(): List<FileDto> {
-        val json = JSONObject(MOCK_JSON)
-        val filesArray = json.getJSONArray("files")
+        val now = System.currentTimeMillis()
         val result = mutableListOf<FileDto>()
 
-        // 动态时间戳，保证首页三种时间展示场景都能命中
-        val now = System.currentTimeMillis()
-        val thisYearTimestamp = Calendar.getInstance().apply {
-            set(Calendar.MONTH, Calendar.MARCH)
-            set(Calendar.DAY_OF_MONTH, 15)
-            set(Calendar.HOUR_OF_DAY, 14)
-            set(Calendar.MINUTE, 30)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        val lastYearTimestamp = Calendar.getInstance().apply {
-            set(Calendar.YEAR, 2025)
-            set(Calendar.MONTH, Calendar.MAY)
-            set(Calendar.DAY_OF_MONTH, 23)
-            set(Calendar.HOUR_OF_DAY, 10)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-
-        for (i in 0 until filesArray.length()) {
-            val obj = filesArray.getJSONObject(i)
-            val fileId = obj.getString("fileId")
-
-            val lastOpenedAt = when (fileId) {
-                "file_001" -> now - 9 * 60 * 1000L   // 9分钟前
-                "file_002" -> thisYearTimestamp        // 本年3月15日
-                "file_004" -> lastYearTimestamp         // 2025年5月23日
-                else       -> if (obj.has("lastOpenedAt")) obj.getLong("lastOpenedAt") else null
-            }
-
-            result.add(
-                FileDto(
-                    fileId       = fileId,
-                    name         = obj.getString("name"),
-                    size         = obj.getLong("size"),
-                    uri          = if (obj.isNull("uri")) null else obj.getString("uri"),
-                    type         = obj.getString("type"),
-                    parentId     = if (obj.isNull("parentId")) null else obj.getString("parentId"),
-                    createdAt    = obj.getLong("createdAt"),
-                    updatedAt    = obj.getLong("updatedAt"),
-                    lastOpenedAt = lastOpenedAt,
-                    lastSavedAt  = if (obj.has("lastSavedAt")) obj.getLong("lastSavedAt") else null,
-                )
-            )
+        // ── 手写种子数据（6 条，保证首页场景覆盖）──
+        val seeds = listOf(
+            Triple("folder_001", "项目资料", "folder"),
+            Triple("folder_002", "视频素材", "folder"),
+            Triple("folder_003", "前端文档", "folder"),
+            Triple("file_001",    "需求说明.txt", "txt"),
+            Triple("file_002",    "产品演示.mp4", "video"),
+            Triple("file_003",    "会议记录.txt", "txt"),
+        )
+        seeds.forEach { (id, name, type) ->
+            result.add(FileDto(
+                fileId = id, name = name, size = if (type == "folder") 0L else (1024L..52428800L).random(),
+                uri = null, type = type, parentId = if (id == "folder_003") "folder_001" else null,
+                createdAt = now - 86400_000L * 30, updatedAt = now - 86400_000L * 30,
+                lastOpenedAt = if (type != "folder") now - (5..120).random() * 60_000L else null,
+                lastSavedAt  = if (id == "file_003") now - 3600_000L * 5 else null
+            ))
         }
+
+        // ── 批量生成 120 条，按类型均匀分布 ──
+        val types  = listOf("folder", "video", "txt")
+        val folderNames = listOf("设计稿", "会议录音", "合同文件", "学习笔记", "产品原型", "周报汇总",
+            "客户资料", "技术文档", "运营数据", "财务报表", "培训视频", "项目交付")
+        val videoNames  = listOf("团建花絮", "发布会录屏", "用户访谈", "产品演示", "技术分享",
+            "新人培训", "季度复盘", "需求评审", "UI 动效参考", "竞品分析录屏")
+        val docNames    = listOf("接口文档", "数据库设计", "需求 PRD", "测试用例", "上线 checklist",
+            "代码规范", "部署指南", "故障复盘", "架构方案", "性能优化", "埋点方案", "AB 实验报告")
+
+        repeat(120) { i ->
+            val type = types[i % 3]
+            val suffix = String.format("%03d", i + 10)
+            val name = when (type) {
+                "folder" -> "${folderNames[i % folderNames.size]}_${i / types.size}"
+                "video"  -> "${videoNames[i % videoNames.size]}.mp4"
+                else     -> "${docNames[i % docNames.size]}.txt"
+            }
+            val parentId = if (type != "folder" && i % 4 == 0) "folder_001"
+                           else if (type != "folder" && i % 4 == 1) "folder_002"
+                           else null
+            result.add(FileDto(
+                fileId       = "gen_${type}_$suffix",
+                name         = name,
+                size         = if (type == "folder") 0 else (1024L..104857600L).random(),
+                uri          = null,
+                type         = type,
+                parentId     = parentId,
+                createdAt    = now - (i * 3600_000L),
+                updatedAt    = now - (i * 1800_000L),
+                lastOpenedAt = if (type != "folder") now - (i * 60_000L + (0..300_000L).random()) else null,
+                lastSavedAt  = null
+            ))
+        }
+
         return result
     }
 
-    private val MOCK_JSON = """
-    {
-      "storage": {
-        "usedG": 4.9,
-        "totalG": 10.0
-      },
-      "files": [
-        {
-          "fileId": "folder_001",
-          "name": "项目资料",
-          "size": 0,
-          "uri": null,
-          "type": "folder",
-          "parentId": null,
-          "createdAt": 1748000000000,
-          "updatedAt": 1748000000000
-        },
-        {
-          "fileId": "folder_003",
-          "name": "前端文档",
-          "size": 0,
-          "uri": null,
-          "type": "folder",
-          "parentId": "folder_001",
-          "createdAt": 1748000000000,
-          "updatedAt": 1748000000000
-        },
-        {
-          "fileId": "folder_002",
-          "name": "视频",
-          "size": 0,
-          "uri": null,
-          "type": "folder",
-          "parentId": null,
-          "createdAt": 1748000000000,
-          "updatedAt": 1748000000000
-        },
-        {
-          "fileId": "file_001",
-          "name": "需求说明.txt",
-          "size": 2048,
-          "uri": "content://mock/requirements.txt",
-          "type": "txt",
-          "parentId": "folder_001",
-          "createdAt": 1748000000000,
-          "updatedAt": 1748000000000,
-          "lastOpenedAt": 1748008100000
-        },
-        {
-          "fileId": "file_002",
-          "name": "产品演示.mp4",
-          "size": 52428800,
-          "uri": "content://mock/demo.mp4",
-          "type": "video",
-          "parentId": "folder_002",
-          "createdAt": 1748000000000,
-          "updatedAt": 1748000000000,
-          "lastOpenedAt": 1748007900000
-        },
-        {
-          "fileId": "file_003",
-          "name": "会议记录.txt",
-          "size": 1024,
-          "uri": "content://mock/meeting.txt",
-          "type": "txt",
-          "parentId": "folder_001",
-          "createdAt": 1748000000000,
-          "updatedAt": 1748000000000,
-          "lastSavedAt": 1748005000000
-        },
-        {
-          "fileId": "file_004",
-          "name": "组件设计.txt",
-          "size": 512,
-          "uri": "content://mock/component.txt",
-          "type": "txt",
-          "parentId": "folder_003",
-          "createdAt": 1748000000000,
-          "updatedAt": 1748000000000,
-          "lastOpenedAt": 1748008200000
-        }
-      ]
-    }
-    """
 }

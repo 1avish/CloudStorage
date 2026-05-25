@@ -15,3 +15,6 @@ docs/
 # Local build/cache artifacts
 /.kotlin/
 /classes.jar
+
+# Claude Code
+.claude/

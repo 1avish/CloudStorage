@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,6 +31,8 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +92,12 @@ fun FileListScreen(
     val files by viewModel.files.collectAsStateWithLifecycle()
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
 
+    // ── 性能监测（测试完连同 FileListPerfMonitor 一起删除）──
+    DisposableEffect(Unit) {
+        FileListPerfMonitor.start()
+        onDispose { FileListPerfMonitor.stop() }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -134,19 +141,20 @@ fun FileListScreen(
             if (files.isEmpty()) {
                 EmptyFileList()
             } else {
+                // lastFileId 在 items 块外计算，避免 lambda 捕获 files 列表
+                val lastFileId = files.last().id
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 4.w.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         bottom = 96.w.dp
                     )
                 ) {
-                    items(files, key = { it.id }) { file ->
+                    items(files, key = { it.id }, contentType = { it.type.name }) { file ->
                         FileListItem(
                             file = file,
-                            showDivider = file.id != files.last().id
+                            showDivider = file.id != lastFileId
                         )
                     }
                 }
@@ -242,11 +250,17 @@ private fun CapsuleSegmentedControl(
 // 文件列表项（严格对齐设计稿）
 // ────────────────────────────────────────────────
 
+@Stable
 @Composable
 private fun FileListItem(file: CloudFile, showDivider: Boolean = true) {
-    val (icon, iconBg, iconTint) = fileStyle(file.type)
+    TrackRecompose(file.id)
+    val (icon, iconBg, iconTint) = remember(file.type) { fileStyle(file.type) }
+    val formattedSize = remember(file.size, file.type) {
+        if (file.type != FileType.Folder && file.size > 0) formatFileSize(file.size) else null
+    }
+    val formattedTime = remember(file.updatedAt) { formatTimestamp(file.updatedAt) }
 
-    Column {
+    Column(modifier = Modifier.height(74.w.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -284,9 +298,9 @@ private fun FileListItem(file: CloudFile, showDivider: Boolean = true) {
                 )
                 Spacer(modifier = Modifier.height(6.w.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (file.type != FileType.Folder && file.size > 0) {
+                    if (formattedSize != null) {
                         Text(
-                            text = formatFileSize(file.size),
+                            text = formattedSize,
                             fontSize = 12.ws.sp,
                             fontWeight = FontWeight.Medium,
                             color = TextSecondary
@@ -298,7 +312,7 @@ private fun FileListItem(file: CloudFile, showDivider: Boolean = true) {
                         )
                     }
                     Text(
-                        text = formatTimestamp(file.updatedAt),
+                        text = formattedTime,
                         fontSize = 12.ws.sp,
                         fontWeight = FontWeight.Medium,
                         color = TextSecondary
