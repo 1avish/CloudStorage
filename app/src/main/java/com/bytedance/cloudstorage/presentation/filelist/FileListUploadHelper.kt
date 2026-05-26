@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.bytedance.cloudstorage.domain.model.CloudFile
+import java.io.File
 
 // ────────────────────────────────────────────────
 // 文件上传辅助函数
@@ -20,13 +21,6 @@ internal fun mimeTypeToFileType(mimeType: String?): String = when {
 
 /**
  * 生成去重后的文件名。
- *
- * 如果 [desiredName] 不在 [existingNames] 中，直接返回原名；
- * 否则在扩展名前追加 "（1）"、"（2）" 等序号直到不冲突。
- *
- * 示例：
- * - "hello.txt" 已存在 → "hello（1）.txt"
- * - "README" 已存在   → "README（1）"
  */
 internal fun generateUniqueName(
     desiredName: String,
@@ -39,7 +33,7 @@ internal fun generateUniqueName(
     val extension: String
     if (dotIndex > 0) {
         baseName = desiredName.substring(0, dotIndex)
-        extension = desiredName.substring(dotIndex) // 含 "."
+        extension = desiredName.substring(dotIndex)
     } else {
         baseName = desiredName
         extension = ""
@@ -56,13 +50,15 @@ internal fun generateUniqueName(
 }
 
 /**
- * 从 Content URI 读取文件元数据并写入本地数据库。
+ * 从 Content URI 选取文件后，拷贝到应用本地目录，写入数据库。
  *
  * 流程：
- * 1. ContentResolver.query() 读取 DISPLAY_NAME 和 SIZE
- * 2. 对文件名做重名检测，必要时追加序号
- * 3. 将数据封装为 FileEntity，通过 ViewModel 存入 Room
- * 4. 数据库变更自动触发 Room Flow → UI 即时刷新
+ * 1. 从 content:// URI 读取元数据（文件名、大小）
+ * 2. 将文件内容拷贝到 app 私有目录 files/uploads/
+ * 3. 以本地 file:// 路径存入数据库
+ *
+ * 为什么拷贝到本地目录？content:// URI 的读权限是临时的，
+ * ExoPlayer 等后台组件无法持续访问，拷贝到本地目录彻底解决权限问题。
  */
 internal fun uploadSelectedFile(
     context: Context,
@@ -87,10 +83,35 @@ internal fun uploadSelectedFile(
 
     val uniqueName = generateUniqueName(fileName, existingFiles.map { it.name }.toSet())
 
+    // 拷贝到应用本地目录
+    val localUri = copyToAppStorage(context, uri, uniqueName)
+
     viewModel.uploadFile(
         name = uniqueName,
         size = fileSize,
-        uri = uri.toString(),
+        uri = localUri.toString(),
         type = fileType
     )
+}
+
+/**
+ * 将 content:// 文件拷贝到 app 私有目录 files/uploads/
+ * @return 本地文件的 file:// URI，失败则返回原始 content:// URI
+ */
+private fun copyToAppStorage(context: Context, sourceUri: Uri, fileName: String): Uri {
+    val uploadDir = File(context.filesDir, "uploads")
+    if (!uploadDir.exists()) uploadDir.mkdirs()
+
+    val localFile = File(uploadDir, fileName)
+
+    return try {
+        context.contentResolver.openInputStream(sourceUri)?.use { input ->
+            localFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        Uri.fromFile(localFile)
+    } catch (_: Exception) {
+        sourceUri
+    }
 }

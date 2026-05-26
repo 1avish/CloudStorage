@@ -57,6 +57,7 @@ internal fun FileListItem(
     onCircleClick: (() -> Unit)? = null,
     onLongPress: (() -> Unit)? = null,
     onFolderClick: ((String) -> Unit)? = null,
+    onFileClick: (() -> Unit)? = null,
 ) {
     TrackRecompose(file.id)
     val (icon, iconBg, iconTint) = remember(file.type) { fileStyle(file.type) }
@@ -87,12 +88,16 @@ internal fun FileListItem(
                             onClick = {
                                 if (file.type == FileType.Folder && onFolderClick != null) {
                                     onFolderClick(file.id)
+                                } else if (file.type != FileType.Folder && onFileClick != null) {
+                                    onFileClick()
                                 }
                             },
                             onLongClick = { onLongPress() }
                         )
                     } else if (file.type == FileType.Folder && onFolderClick != null) {
                         Modifier.clickable { onFolderClick(file.id) }
+                    } else if (file.type != FileType.Folder && onFileClick != null) {
+                        Modifier.clickable { onFileClick() }
                     } else Modifier
                 )
                 .padding(horizontal = 16.w.dp),
