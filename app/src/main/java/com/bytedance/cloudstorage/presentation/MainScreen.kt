@@ -21,7 +21,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun MainScreen(
-    onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> }
+    onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
+    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -72,10 +73,14 @@ fun MainScreen(
                 .padding(innerPadding)
         ) { page ->
             when (page) {
-                0 -> HomeScreen()
+                0 -> HomeScreen(
+                    onOpenVideo = onOpenVideo,
+                    onOpenTxt = onOpenTxt
+                )
                 1 -> FileListScreen(
                     viewModel = fileListViewModel,
-                    onOpenVideo = onOpenVideo
+                    onOpenVideo = onOpenVideo,
+                    onOpenTxt = onOpenTxt
                 )
             }
         }

@@ -65,7 +65,8 @@ import com.bytedance.cloudstorage.utils.ws
 @Composable
 fun FileListScreen(
     viewModel: FileListViewModel = viewModel(),
-    onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> }
+    onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
+    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val files by viewModel.files.collectAsStateWithLifecycle()
     val atRoot by viewModel.atRoot.collectAsStateWithLifecycle()
@@ -213,9 +214,15 @@ fun FileListScreen(
                                 onFolderClick = if (file.type == FileType.Folder) { folderId ->
                                     viewModel.navigateIntoFolder(folderId, file.name)
                                 } else null,
-                                onFileClick = if (file.type == FileType.Video) {
-                                    { onOpenVideo(file.id, file.name, file.uri ?: "") }
-                                } else null
+                                onFileClick = when (file.type) {
+                                    FileType.Video -> {
+                                        { onOpenVideo(file.id, file.name, file.uri ?: "") }
+                                    }
+                                    FileType.Txt -> {
+                                        { onOpenTxt(file.id, file.name, file.uri ?: "") }
+                                    }
+                                    else -> null
+                                }
                             )
                         }
                     }
