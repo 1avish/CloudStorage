@@ -81,9 +81,6 @@ fun FileListScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     val sortType by viewModel.sortType.collectAsStateWithLifecycle()
     val sortDirection by viewModel.sortDirection.collectAsStateWithLifecycle()
-    val fileOrderKey = remember(files) {
-        files.joinToString(separator = "|") { it.id }
-    }
     val sheetState = rememberModalBottomSheetState()
 
     val context = LocalContext.current
@@ -192,7 +189,7 @@ fun FileListScreen(
             } else {
                 // lastFileId 在 items 块外计算，避免 lambda 捕获 files 列表
                 val lastFileId = files.last().id
-                key(selectedFilterIndex, sortType, sortDirection, fileOrderKey) {
+                key(selectedFilterIndex, sortType, sortDirection) {
                     val listState = rememberLazyListState()
                     LazyColumn(
                         state = listState,
@@ -203,7 +200,11 @@ fun FileListScreen(
                             bottom = if (isSelectionMode) 180.w.dp else 96.w.dp
                         )
                     ) {
-                        items(files, contentType = { it.type.name }) { file ->
+                        items(
+                            items = files,
+                            key = { it.id },
+                            contentType = { it.type.name }
+                        ) { file ->
                             FileListItem(
                                 file = file,
                                 isSelected = file.id in selectedFileIds,

@@ -1,10 +1,14 @@
 package com.bytedance.cloudstorage.presentation.filelist
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.bytedance.cloudstorage.domain.model.CloudFile
 import java.io.File
+import java.util.UUID
+import kotlin.math.roundToInt
 
 // ────────────────────────────────────────────────
 // 文件上传辅助函数
@@ -85,11 +89,17 @@ internal fun uploadSelectedFile(
 
     // 拷贝到应用本地目录
     val localUri = copyToAppStorage(context, uri, uniqueName)
+    val coverUri = if (fileType == "video") {
+        createVideoCover(context, localUri)?.toString()
+    } else {
+        null
+    }
 
     viewModel.uploadFile(
         name = uniqueName,
         size = fileSize,
         uri = localUri.toString(),
+        coverUri = coverUri,
         type = fileType
     )
 }
@@ -114,4 +124,33 @@ private fun copyToAppStorage(context: Context, sourceUri: Uri, fileName: String)
     } catch (_: Exception) {
         sourceUri
     }
+}
+
+internal fun createVideoCover(context: Context, videoUri: Uri): Uri? {
+    val coverDir = File(context.filesDir, "covers")
+    if (!coverDir.exists()) coverDir.mkdirs()
+
+    val coverFile = File(coverDir, "${UUID.randomUUID()}.jpg")
+    val retriever = MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(context, videoUri)
+        val frame = retriever.getFrameAtTime(0L, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            ?: return null
+        val cover = frame.scaleToCover(maxWidth = 320)
+        coverFile.outputStream().use { output ->
+            cover.compress(Bitmap.CompressFormat.JPEG, 78, output)
+        }
+        Uri.fromFile(coverFile)
+    } catch (_: Exception) {
+        null
+    } finally {
+        retriever.release()
+    }
+}
+
+private fun Bitmap.scaleToCover(maxWidth: Int): Bitmap {
+    if (width <= maxWidth) return this
+    val ratio = maxWidth.toFloat() / width
+    val targetHeight = (height * ratio).roundToInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(this, maxWidth, targetHeight, true)
 }

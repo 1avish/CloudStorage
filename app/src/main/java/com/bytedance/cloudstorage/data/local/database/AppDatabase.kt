@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bytedance.cloudstorage.data.local.dao.FileDao
 import com.bytedance.cloudstorage.data.local.entity.FileEntity
 
@@ -16,7 +18,7 @@ import com.bytedance.cloudstorage.data.local.entity.FileEntity
  * Room 会在编译期自动生成 AppDatabase_Impl 实现类，
  * 包含建表 SQL 和 DAO 方法的具体实现。
  */
-@Database(entities = [FileEntity::class], version = 1, exportSchema = false)
+@Database(entities = [FileEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
 
     /** 提供 FileDao 实例，Room 自动生成实现 */
@@ -32,13 +34,22 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE files ADD COLUMN coverUri TEXT")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "miniclouddisk.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { INSTANCE = it }
             }
         }
     }

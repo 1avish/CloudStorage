@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bytedance.cloudstorage.data.repository.RecentFileWithFolderInfo
 import com.bytedance.cloudstorage.domain.model.FileType
+import com.bytedance.cloudstorage.presentation.common.VideoCoverThumbnail
 import com.bytedance.cloudstorage.presentation.filelist.fileStyle
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
@@ -401,19 +402,28 @@ private fun RecentFileItemRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 图标容器
-        Box(
-            modifier = Modifier
-                .size(44.w.dp)
-                .clip(RoundedCornerShape(12.w.dp))
-                .background(iconBg),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(22.w.dp)
+        if (item.file.type == FileType.Video && !item.file.coverUri.isNullOrEmpty()) {
+            VideoCoverThumbnail(
+                coverUri = item.file.coverUri,
+                modifier = Modifier.size(44.w.dp),
+                cornerRadiusDp = 12,
+                showPlayIcon = false,
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(44.w.dp)
+                    .clip(RoundedCornerShape(12.w.dp))
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(22.w.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(14.w.dp))

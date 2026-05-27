@@ -165,6 +165,7 @@ class FileRepository(
             name = name,
             size = 0L,
             uri = null,
+            coverUri = null,
             type = "folder",
             parentId = parentId,
             createdAt = now,
@@ -187,6 +188,7 @@ class FileRepository(
         name: String,
         size: Long,
         uri: String,
+        coverUri: String?,
         type: String,
         parentId: String?,
     ) {
@@ -197,6 +199,7 @@ class FileRepository(
             name = name,
             size = size,
             uri = uri,
+            coverUri = coverUri,
             type = type,
             parentId = parentId,
             createdAt = now,

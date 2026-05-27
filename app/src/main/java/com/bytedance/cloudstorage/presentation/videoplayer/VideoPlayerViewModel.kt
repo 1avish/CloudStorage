@@ -13,6 +13,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.bytedance.cloudstorage.data.local.database.AppDatabase
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,10 @@ data class Episode(
     val id: String,
     val title: String,
     val duration: String = "",
-    val uri: String = ""
+    val uri: String = "",
+    val size: Long = 0L,
+    val updatedAt: Long = 0L,
+    val coverUri: String? = null,
 )
 
 class VideoPlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -62,6 +66,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private var initialized = false
     private var fileId: String = ""
+    private var episodeJob: Job? = null
     private val fileDao = AppDatabase.getInstance(application).fileDao()
 
     fun initVideo(id: String, fileName: String, fileUri: String) {
@@ -72,13 +77,43 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val episode = Episode(id, fileName, uri = fileUri)
         _activeEpisode.value = episode
         _episodes.value = listOf(episode)
+        loadEpisodes(id)
 
         if (fileUri.isNotEmpty()) {
             initPlayer(fileUri)
         }
     }
 
-    private fun initPlayer(uriString: String) {
+    private fun loadEpisodes(id: String) {
+        episodeJob?.cancel()
+        episodeJob = viewModelScope.launch {
+            val currentFile = withContext(Dispatchers.IO) {
+                fileDao.getFileById(id)
+            } ?: return@launch
+            fileDao.getVideoFilesByParent(currentFile.parentId).collect { files ->
+                val episodes = files.map { file ->
+                    Episode(
+                        id = file.fileId,
+                        title = file.name,
+                        uri = file.uri.orEmpty(),
+                        size = file.size,
+                        updatedAt = file.updatedAt,
+                        coverUri = file.coverUri,
+                    )
+                }
+                _episodes.value = episodes
+
+                val activeId = _activeEpisode.value.id.ifEmpty { id }
+                val active = episodes.firstOrNull { it.id == activeId }
+                    ?: episodes.firstOrNull { it.id == id }
+                if (active != null) {
+                    _activeEpisode.value = active
+                }
+            }
+        }
+    }
+
+    private fun initPlayer(uriString: String): ExoPlayer {
         val player = ExoPlayer.Builder(getApplication()).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.parse(uriString)))
             prepare()
@@ -103,6 +138,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 exoPlayer = null
             }
         })
+        return player
     }
 
     fun togglePlayPause() {
@@ -111,14 +147,14 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun selectEpisode(episode: Episode) {
+        fileId = episode.id
         _activeEpisode.value = episode
-        exoPlayer?.let { player ->
-            if (episode.uri.isNotEmpty()) {
-                player.setMediaItem(MediaItem.fromUri(Uri.parse(episode.uri)))
-                player.prepare()
-                player.setPlaybackSpeed(_playbackSpeed.value)
-                player.play()
-            }
+        if (episode.uri.isNotEmpty()) {
+            val player = exoPlayer ?: initPlayer(episode.uri)
+            player.setMediaItem(MediaItem.fromUri(Uri.parse(episode.uri)))
+            player.prepare()
+            player.setPlaybackSpeed(_playbackSpeed.value)
+            player.play()
         }
     }
 
@@ -201,6 +237,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 if (episode.uri.isNotEmpty()) {
                     val localFile = File(Uri.parse(episode.uri).path ?: "")
                     if (localFile.exists()) localFile.delete()
+                }
+                // 删除视频封面文件
+                if (!episode.coverUri.isNullOrEmpty()) {
+                    val coverFile = File(Uri.parse(episode.coverUri).path ?: "")
+                    if (coverFile.exists()) coverFile.delete()
                 }
                 withContext(Dispatchers.Main) {
                     exoPlayer?.release()

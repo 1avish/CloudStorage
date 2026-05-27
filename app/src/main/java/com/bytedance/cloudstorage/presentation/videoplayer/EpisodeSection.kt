@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -34,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bytedance.cloudstorage.presentation.common.VideoCoverThumbnail
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 
@@ -98,6 +97,20 @@ private fun EpisodeCard(episode: Episode, isActive: Boolean, onClick: () -> Unit
                 .background(Brush.linearGradient(listOf(Color(0xFF0D2240), Color(0xFF163552)))),
             contentAlignment = Alignment.Center
         ) {
+            if (!episode.coverUri.isNullOrEmpty()) {
+                VideoCoverThumbnail(
+                    coverUri = episode.coverUri,
+                    modifier = Modifier.matchParentSize(),
+                    cornerRadiusDp = 0,
+                    showPlayIcon = false,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.72f)
+                )
+            }
             // 时长标签
             if (episode.duration.isNotEmpty()) {
                 Box(
@@ -135,7 +148,7 @@ private fun EpisodeCard(episode: Episode, isActive: Boolean, onClick: () -> Unit
                 episode.title,
                 fontSize = 11.ws.sp,
                 lineHeight = 15.ws.sp,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
                 color = if (isActive) ProgressBlue else TextPrimary

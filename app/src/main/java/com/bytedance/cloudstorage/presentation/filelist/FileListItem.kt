@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bytedance.cloudstorage.domain.model.CloudFile
 import com.bytedance.cloudstorage.domain.model.FileType
+import com.bytedance.cloudstorage.presentation.common.VideoCoverThumbnail
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 import java.text.SimpleDateFormat
@@ -103,19 +104,28 @@ internal fun FileListItem(
                 .padding(horizontal = 16.w.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(46.w.dp)
-                    .clip(RoundedCornerShape(14.w.dp))
-                    .background(iconBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(24.w.dp)
+            if (file.type == FileType.Video && !file.coverUri.isNullOrEmpty()) {
+                VideoCoverThumbnail(
+                    coverUri = file.coverUri,
+                    modifier = Modifier.size(46.w.dp),
+                    cornerRadiusDp = 14,
+                    showPlayIcon = false,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(46.w.dp)
+                        .clip(RoundedCornerShape(14.w.dp))
+                        .background(iconBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(24.w.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(14.w.dp))

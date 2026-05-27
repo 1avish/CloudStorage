@@ -22,13 +22,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // ────────────────────────────────────────────────
 // 视频信息卡片（标题、时间、大小、格式）
 // ────────────────────────────────────────────────
 
 @Composable
-internal fun VideoInfoCard(title: String) {
+internal fun VideoInfoCard(
+    title: String,
+    updatedAt: Long,
+    size: Long,
+) {
     Column(
         modifier = Modifier
             .padding(horizontal = 12.w.dp)
@@ -49,9 +56,9 @@ internal fun VideoInfoCard(title: String) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(8.w.dp))
-                Text("修改时间：2026-05-24 18:36", fontSize = 12.ws.sp, color = TextSecondary)
+                Text("修改时间：${formatVideoTimestamp(updatedAt)}", fontSize = 12.ws.sp, color = TextSecondary)
                 Spacer(modifier = Modifier.height(4.w.dp))
-                Text("文件大小：428.6 MB", fontSize = 12.ws.sp, color = TextSecondary)
+                Text("文件大小：${formatVideoFileSize(size)}", fontSize = 12.ws.sp, color = TextSecondary)
             }
             Box(
                 modifier = Modifier
@@ -63,4 +70,17 @@ internal fun VideoInfoCard(title: String) {
             }
         }
     }
+}
+
+private fun formatVideoFileSize(bytes: Long): String = when {
+    bytes <= 0L -> "--"
+    bytes < 1024 -> "${bytes}B"
+    bytes < 1024 * 1024 -> "%.1fKB".format(bytes / 1024.0)
+    bytes < 1024L * 1024 * 1024 -> "%.1fMB".format(bytes / (1024.0 * 1024))
+    else -> "%.1fGB".format(bytes / (1024.0 * 1024 * 1024))
+}
+
+private fun formatVideoTimestamp(timestamp: Long): String {
+    if (timestamp <= 0L) return "--"
+    return SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(timestamp))
 }

@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -157,11 +158,20 @@ fun VideoPlayerScreen(
         }
         insetsController?.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        insetsController?.hide(WindowInsetsCompat.Type.systemBars())
 
         onDispose {
             insetsController?.show(WindowInsetsCompat.Type.systemBars())
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    LaunchedEffect(activity, isFullscreen) {
+        val window = activity?.window ?: return@LaunchedEffect
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        if (isFullscreen) {
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
@@ -252,6 +262,7 @@ fun VideoPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(PageBg)
+            .statusBarsPadding()
     ) {
         // ── 页面主体：播放器 + 信息 + 选集 ──
         Column(
@@ -282,7 +293,11 @@ fun VideoPlayerScreen(
                 viewModel = viewModel
             )
 
-            VideoInfoCard(title = activeEpisode.title.ifEmpty { fileName })
+            VideoInfoCard(
+                title = activeEpisode.title.ifEmpty { fileName },
+                updatedAt = activeEpisode.updatedAt,
+                size = activeEpisode.size,
+            )
 
             EpisodeSection(
                 episodes = displayEpisodes,
