@@ -103,6 +103,23 @@ interface FileDao {
     """)
     fun getFilesByParentAndType(parentId: String?, type: String): Flow<List<FileEntity>>
 
+    /** 根据文件 ID 查询单个文件 */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND fileId = :fileId
+        LIMIT 1
+    """)
+    suspend fun getFileById(fileId: String): FileEntity?
+
+    /** 获取指定目录下的视频文件，供视频播放页选集使用 */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND type = 'video'
+              AND CASE WHEN :parentId IS NULL THEN parentId IS NULL ELSE parentId = :parentId END
+        ORDER BY name COLLATE NOCASE ASC
+    """)
+    fun getVideoFilesByParent(parentId: String?): Flow<List<FileEntity>>
+
     /**
      * 根据文件夹名称和父级 ID 查找文件夹 fileId（供面包屑导航反查使用）
      */
