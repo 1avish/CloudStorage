@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.bytedance.cloudstorage.data.local.entity.FileEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -111,6 +112,13 @@ interface FileDao {
     """)
     suspend fun getFileById(fileId: String): FileEntity?
 
+    /** 根据文件 ID 列表批量查询，用于分享链接还原文件列表 */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND fileId IN (:fileIds)
+    """)
+    suspend fun getFilesByIds(fileIds: List<String>): List<FileEntity>
+
     /** 获取指定目录下的视频文件，供视频播放页选集使用 */
     @Query("""
         SELECT * FROM files
@@ -135,7 +143,36 @@ interface FileDao {
     @Query("UPDATE files SET isDeleted = 1 WHERE fileId IN (:ids)")
     suspend fun deleteFiles(ids: List<String>)
 
+    /**
+     * 获取指定文件夹下的所有文件（挂起版本，非 Flow）。
+     *
+     * 用于事务内读取（如递归复制文件树），避免 Flow 在事务中
+     * 使用不同数据库连接导致读不到未提交的写入。
+     *
+     * @param parentId 父文件夹 ID，null 表示根目录
+     */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND
+              CASE WHEN :parentId IS NULL THEN parentId IS NULL ELSE parentId = :parentId END
+        ORDER BY
+            CASE WHEN type = 'folder' THEN 0 ELSE 1 END,
+            updatedAt DESC
+    """)
+    suspend fun getFilesByParentOnce(parentId: String?): List<FileEntity>
+
     /** 重命名文件 */
     @Query("UPDATE files SET name = :newName, updatedAt = :now WHERE fileId = :fileId")
     suspend fun renameFile(fileId: String, newName: String, now: Long)
+
+    /**
+     * 在事务中执行任意数据库操作。
+     *
+     * 用于 Repository 中需要原子性的多步读写场景（如递归复制文件树）。
+     * Room 的 @Transaction 会在协程上下文中正确使用 withTransaction。
+     */
+    @Transaction
+    suspend fun runInTransaction(block: suspend () -> Unit) {
+        block()
+    }
 }

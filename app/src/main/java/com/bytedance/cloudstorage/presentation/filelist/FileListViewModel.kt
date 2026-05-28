@@ -6,10 +6,15 @@ import androidx.lifecycle.viewModelScope
 import com.bytedance.cloudstorage.data.local.database.AppDatabase
 import com.bytedance.cloudstorage.data.remote.datasource.MockFileRemoteDataSource
 import com.bytedance.cloudstorage.data.repository.FileRepository
+import com.bytedance.cloudstorage.data.share.CreatedShareLink
+import com.bytedance.cloudstorage.data.share.ShareLinkHandledAction
+import com.bytedance.cloudstorage.data.share.ShareLinkStore
 import com.bytedance.cloudstorage.domain.model.CloudFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -36,6 +41,13 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         fileDao = db.fileDao(),
         remoteDataSource = MockFileRemoteDataSource(),
     )
+    private val shareLinkStore = ShareLinkStore(application)
+
+    private val _createdShareLink = MutableSharedFlow<CreatedShareLink?>(extraBufferCapacity = 1)
+    val createdShareLink: SharedFlow<CreatedShareLink?> = _createdShareLink
+
+    private val _shareTokenLookupResult = MutableSharedFlow<String?>(extraBufferCapacity = 1)
+    val shareTokenLookupResult: SharedFlow<String?> = _shareTokenLookupResult
 
     // ── 当前文件夹层级（null = 根目录） ──
     private val _currentFolderId = MutableStateFlow<String?>(null)
@@ -247,6 +259,48 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     fun renameFile(fileId: String, newName: String) {
         viewModelScope.launch {
             repository.renameFile(fileId, newName)
+        }
+    }
+
+    /**
+     * 为当前选中的文件创建分享链接。
+     *
+     * 结果通过 [createdShareLink] 发送，创建成功时已自动复制到剪贴板。
+     */
+    fun createShareLink() {
+        val selectedIds = _selectedFileIds.value
+        val ids = files.value.map { it.id }.filter { it in selectedIds }
+        if (ids.isEmpty()) {
+            viewModelScope.launch { _createdShareLink.emit(null) }
+            return
+        }
+        viewModelScope.launch {
+            val link = shareLinkStore.createShare(ids)
+            shareLinkStore.copyToClipboard(link)
+            _createdShareLink.emit(link)
+        }
+    }
+
+    /**
+     * 根据用户输入的原始链接文本查找本地已存在的分享 token。
+     *
+     * @param rawLink 用户粘贴的链接文本（支持完整 URL 或纯 token）
+     * 结果通过 [shareTokenLookupResult] 发送，链接不存在时发送 null。
+     */
+    fun findExistingShareToken(rawLink: String) {
+        val token = ShareLinkStore.parseToken(rawLink)
+        if (token == null) {
+            viewModelScope.launch { _shareTokenLookupResult.emit(null) }
+            return
+        }
+        viewModelScope.launch {
+            _shareTokenLookupResult.emit(token.takeIf { shareLinkStore.hasShare(it) })
+        }
+    }
+
+    fun markShareLinkHandled(token: String, action: ShareLinkHandledAction) {
+        viewModelScope.launch {
+            shareLinkStore.markHandled(token, action)
         }
     }
 
