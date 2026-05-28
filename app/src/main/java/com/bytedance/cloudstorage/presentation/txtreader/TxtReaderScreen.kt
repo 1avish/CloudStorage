@@ -55,9 +55,7 @@ private val ReaderText = Color(0xFF111827)
 private val ReaderSubText = Color(0xFF8B919E)
 private val ReaderBlue = Color(0xFF3370FF)
 
-// ────────────────────────────────────────────────
-// TXT 加载状态封装
-// ────────────────────────────────────────────────
+// ── TXT 加载状态封装
 
 private sealed interface TxtLoadState {
     data object Loading : TxtLoadState
@@ -65,9 +63,7 @@ private sealed interface TxtLoadState {
     data class Error(val message: String) : TxtLoadState
 }
 
-// ────────────────────────────────────────────────
-// TXT 阅读器主页面
-// ────────────────────────────────────────────────
+// ── TXT 阅读器主页面
 
 @Composable
 fun TxtReaderScreen(

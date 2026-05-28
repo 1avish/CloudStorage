@@ -4,7 +4,6 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,10 +13,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -41,17 +38,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
 @Composable
 fun FullscreenPlayer(
@@ -250,7 +243,11 @@ private fun FullscreenProgressRow(
                 .weight(1f)
                 .padding(horizontal = 12.dp)
         ) {
-            FullscreenProgressBar(viewModel, durationMs, onSeek)
+            VideoProgressBar(
+                viewModel = viewModel,
+                durationMs = durationMs,
+                onSeek = onSeek,
+            )
         }
         Text(
             formatTime(durationMs),
@@ -332,89 +329,3 @@ private fun SpeedSelector(
     }
 }
 
-@Composable
-private fun FullscreenProgressBar(
-    viewModel: VideoPlayerViewModel,
-    durationMs: Long,
-    onSeek: (Float) -> Unit
-) {
-    val currentPos by viewModel.currentPosition.collectAsStateWithLifecycle()
-    val progress = if (durationMs > 0) (currentPos.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
-    var trackWidthPx by remember { mutableStateOf(0f) }
-    var dragFraction by remember { mutableStateOf<Float?>(null) }
-    var pendingSeekFraction by remember { mutableStateOf<Float?>(null) }
-    val displayProgress = dragFraction ?: pendingSeekFraction ?: progress
-
-    LaunchedEffect(currentPos, durationMs, pendingSeekFraction, dragFraction) {
-        val targetFraction = pendingSeekFraction ?: return@LaunchedEffect
-        if (dragFraction != null || durationMs <= 0L) return@LaunchedEffect
-
-        val targetPos = (targetFraction * durationMs).toLong()
-        if (abs(currentPos - targetPos) <= 500L) {
-            pendingSeekFraction = null
-        }
-    }
-
-    LaunchedEffect(pendingSeekFraction) {
-        if (pendingSeekFraction != null) {
-            delay(700)
-            pendingSeekFraction = null
-        }
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp)
-            .onSizeChanged { trackWidthPx = it.width.toFloat() }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragStart = { offset ->
-                        if (trackWidthPx > 0f) {
-                            dragFraction = (offset.x / trackWidthPx).coerceIn(0f, 1f)
-                        }
-                    },
-                    onDragEnd = {
-                        dragFraction?.let {
-                            pendingSeekFraction = it
-                            onSeek(it)
-                        }
-                        dragFraction = null
-                    },
-                    onDragCancel = { dragFraction = null },
-                    onHorizontalDrag = { change, _ ->
-                        if (trackWidthPx > 0f) {
-                            dragFraction = (change.position.x / trackWidthPx).coerceIn(0f, 1f)
-                        }
-                        change.consume()
-                    }
-                )
-            },
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.28f))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(displayProgress)
-                    .height(3.dp)
-                    .clip(RoundedCornerShape(2.dp))
-                    .background(ProgressBlue)
-            )
-        }
-        if (trackWidthPx > 0f) {
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset((trackWidthPx * displayProgress - 7.dp.toPx()).roundToInt(), 0) }
-                    .size(14.dp)
-                    .clip(CircleShape)
-                    .background(Color.White)
-            )
-        }
-    }
-}

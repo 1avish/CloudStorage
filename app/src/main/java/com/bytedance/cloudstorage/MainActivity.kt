@@ -13,6 +13,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 初始化 ScreenUtils，基准设计稿宽度 390px
         ScreenUtils.init(this, designWidth = 390f)
 
         enableEdgeToEdge()

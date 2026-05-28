@@ -38,24 +38,7 @@ import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 import kotlinx.coroutines.delay
 
-// ────────────────────────────────────────────────
-// 颜色 & 常量
-// ────────────────────────────────────────────────
-
-internal val PlayerBg = Color(0xFF000000)
-internal val ProgressBlue = Color(0xFF1677FF)
-internal val PageBg = Color(0xFFF4F5F7)
-internal val TextPrimary = Color(0xFF1D2129)
-internal val TextSecondary = Color(0xFF8C93A4)
-internal val BorderGray = Color(0xFFE5E6EB)
-internal val ControlWhite = Color.White
-internal val BlueSoft = Color(0xFFE8F2FF)
-internal val SheetBg = Color(0xFFF5F7FA)
-internal val PlaybackSpeeds = listOf(0.75f, 1f, 1.25f, 1.5f, 2f)
-
-// ────────────────────────────────────────────────
-// 工具函数
-// ────────────────────────────────────────────────
+// ── 工具函数
 
 internal fun formatSpeed(speed: Float): String {
     return if (speed % 1f == 0f) {
@@ -109,24 +92,24 @@ fun VideoPlayerScreen(
     val durationMs by viewModel.duration.collectAsStateWithLifecycle()
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val isDeleted by viewModel.isDeleted.collectAsStateWithLifecycle()
-    val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
     val isPlayerReady by viewModel.isPlayerReady.collectAsStateWithLifecycle()
 
     LaunchedEffect(isDeleted) {
         if (isDeleted) onBack()
     }
 
-    LaunchedEffect(toastMessage) {
-        toastMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            viewModel.clearToast()
+    LaunchedEffect(Unit) {
+        viewModel.toastMessage.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            viewModel.updateProgress()
-            delay(200)
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (true) {
+                viewModel.updateProgress()
+                delay(200)
+            }
         }
     }
 

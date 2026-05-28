@@ -253,6 +253,7 @@ internal fun EmptyFileList() {
 // ────────────────────────────────────────────────
 
 internal fun formatFileSize(bytes: Long): String = when {
+    bytes <= 0L                      -> "--"
     bytes < 1024                   -> "${bytes}B"
     bytes < 1024 * 1024            -> "%.1fKB".format(bytes / 1024.0)
     bytes < 1024L * 1024 * 1024    -> "%.1fMB".format(bytes / (1024.0 * 1024))
@@ -260,6 +261,7 @@ internal fun formatFileSize(bytes: Long): String = when {
 }
 
 internal fun formatTimestamp(timestamp: Long): String {
+    if (timestamp <= 0L) return "--"
     val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
     return sdf.format(Date(timestamp))
 }

@@ -15,7 +15,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.bytedance.cloudstorage.data.local.database.AppDatabase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -61,8 +63,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private val _isDeleted = MutableStateFlow(false)
     val isDeleted: StateFlow<Boolean> = _isDeleted.asStateFlow()
 
-    private val _toastMessage = MutableStateFlow<String?>(null)
-    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+    private val _toastMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val toastMessage: SharedFlow<String> = _toastMessage
 
     private var initialized = false
     private var fileId: String = ""
@@ -180,9 +182,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         exoPlayer?.let { _currentPosition.value = it.currentPosition }
     }
 
-    fun clearToast() {
-        _toastMessage.value = null
-    }
 
     // ── 下载到系统相册/下载目录 ──
 
@@ -217,9 +216,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                         sourceFile.copyTo(dest, overwrite = true)
                     }
                 }
-                _toastMessage.value = "已保存到系统相册"
+                _toastMessage.tryEmit("已保存到系统相册")
             } catch (_: Exception) {
-                _toastMessage.value = "下载失败"
+                _toastMessage.tryEmit("下载失败")
             }
         }
     }
@@ -249,7 +248,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     _isDeleted.value = true
                 }
             } catch (_: Exception) {
-                _toastMessage.value = "删除失败"
+                _toastMessage.tryEmit("删除失败")
             }
         }
     }
@@ -263,9 +262,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                     fileDao.renameFile(fileId, newName, System.currentTimeMillis())
                 }
                 _activeEpisode.value = _activeEpisode.value.copy(title = newName)
-                _toastMessage.value = "已重命名"
+                _toastMessage.tryEmit("已重命名")
             } catch (_: Exception) {
-                _toastMessage.value = "重命名失败"
+                _toastMessage.tryEmit("重命名失败")
             }
         }
     }

@@ -60,7 +60,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.arcore)
     implementation(libs.coil.compose)
-    implementation(libs.androidx.navigation.compose)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
     testImplementation(libs.junit)
