@@ -7,6 +7,7 @@ import com.bytedance.cloudstorage.data.local.database.AppDatabase
 import com.bytedance.cloudstorage.data.remote.datasource.MockFileRemoteDataSource
 import com.bytedance.cloudstorage.data.repository.FileRepository
 import com.bytedance.cloudstorage.domain.model.CloudFile
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -29,7 +31,11 @@ enum class SortDirection { ASC, DESC }
  */
 class FileListViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository: FileRepository
+    private val db = AppDatabase.getInstance(application)
+    private val repository = FileRepository(
+        fileDao = db.fileDao(),
+        remoteDataSource = MockFileRemoteDataSource(),
+    )
 
     // ── 当前文件夹层级（null = 根目录） ──
     private val _currentFolderId = MutableStateFlow<String?>(null)
@@ -77,10 +83,12 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
             } else {
                 repository.observeFilesByParentAndType(query.folderId, query.filterType)
             }
-            flow.map { files -> sortFiles(files, query.sortType, query.sortDir) }
+            flow
+                .map { files -> sortFiles(files, query.sortType, query.sortDir) }
+                .flowOn(Dispatchers.Default)
         }
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     // ── 多选状态 ──
     private val _selectedFileIds = MutableStateFlow<Set<String>>(emptySet())
@@ -109,11 +117,6 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     init {
-        val db = AppDatabase.getInstance(application)
-        repository = FileRepository(
-            fileDao = db.fileDao(),
-            remoteDataSource = MockFileRemoteDataSource(),
-        )
         viewModelScope.launch {
             repository.initializeDataIfEmpty()
         }
@@ -151,12 +154,13 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
      * @param uri  content:// URI 字符串
      * @param type 文件类型键："video" / "txt" / "other"
      */
-    fun uploadFile(name: String, size: Long, uri: String, type: String) {
+    fun uploadFile(name: String, size: Long, uri: String, coverUri: String?, type: String) {
         viewModelScope.launch {
             repository.uploadFile(
                 name = name,
                 size = size,
                 uri = uri,
+                coverUri = coverUri,
                 type = type,
                 parentId = _currentFolderId.value,
             )

@@ -16,6 +16,7 @@ data class FileEntity(
     val name: String,              // 文件名
     val size: Long,                // 文件大小（字节），文件夹为 0
     val uri: String?,              // content:// 或 file:// URI
+    val coverUri: String? = null,  // 视频封面本地 URI
     val type: String,              // folder / video / txt / other
     val parentId: String?,         // 父文件夹 ID，null 表示根目录
     val isDeleted: Boolean = false,// 逻辑删除标记

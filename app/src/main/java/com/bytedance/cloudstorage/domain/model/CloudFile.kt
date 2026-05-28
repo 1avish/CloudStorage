@@ -22,6 +22,7 @@ data class CloudFile(
     val type: FileType,
     val size: Long,
     val uri: String?,
+    val coverUri: String?,
     val parentId: String?,
     val createdAt: Long,
     val updatedAt: Long,

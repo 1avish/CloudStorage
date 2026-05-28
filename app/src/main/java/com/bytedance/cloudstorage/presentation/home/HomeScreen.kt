@@ -22,8 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.OndemandVideo
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -51,6 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bytedance.cloudstorage.data.repository.RecentFileWithFolderInfo
 import com.bytedance.cloudstorage.domain.model.FileType
+import com.bytedance.cloudstorage.presentation.common.VideoCoverThumbnail
+import com.bytedance.cloudstorage.presentation.filelist.fileStyle
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 import java.text.SimpleDateFormat
@@ -62,10 +62,6 @@ import java.util.concurrent.TimeUnit
 // 颜色常量，与设计稿对齐
 // ────────────────────────────────────────────────
 private val BgGray         = Color(0xFFF5F6F8)
-private val IconBlue       = Color(0xFF2979FF)
-private val IconPink       = Color(0xFFEB2F96)
-private val IconBgBlue     = Color(0xFFF0F5FF)
-private val IconBgPink     = Color(0xFFFFF0F5)
 private val ProgressBlue   = Color(0xFF2979FF)
 private val ProgressYellow = Color(0xFFFAAD14)
 private val ProgressRed    = Color(0xFFFF4D4F)
@@ -87,7 +83,9 @@ private val ChevronGray    = Color(0xFFC0C4D0)
  */
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(),
+    onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
+    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     // 收集 ViewModel 中的 StateFlow，生命周期感知
     val usedStorageG  by viewModel.usedStorageG.collectAsStateWithLifecycle()
@@ -121,6 +119,8 @@ fun HomeScreen(
                 title = "最近转存",
                 emptyHint = "暂无转存记录",
                 items = recentSaves,
+                onOpenVideo = onOpenVideo,
+                onOpenTxt = onOpenTxt,
             )
         }
         // 最近浏览
@@ -129,6 +129,8 @@ fun HomeScreen(
                 title = "最近浏览",
                 emptyHint = "暂无浏览记录",
                 items = recentViews,
+                onOpenVideo = onOpenVideo,
+                onOpenTxt = onOpenTxt,
             )
         }
     }
@@ -249,6 +251,8 @@ private fun RecentFileCard(
     title: String,
     emptyHint: String,
     items: List<RecentFileWithFolderInfo>,
+    onOpenVideo: (String, String, String) -> Unit,
+    onOpenTxt: (String, String, String) -> Unit,
 ) {
     // 折叠状态，默认展开
     var expanded by remember { mutableStateOf(true) }
@@ -296,7 +300,11 @@ private fun RecentFileCard(
                 } else {
                     Column {
                         items.forEachIndexed { index, item ->
-                            RecentFileItemRow(item)
+                            RecentFileItemRow(
+                                item = item,
+                                onOpenVideo = onOpenVideo,
+                                onOpenTxt = onOpenTxt
+                            )
                             // 非最后一项显示分割线
                             if (index < items.lastIndex) {
                                 Spacer(modifier = Modifier.height(8.w.dp))
@@ -364,35 +372,58 @@ private fun EmptyState(hint: String, cardHeight: Dp) {
  * @param item 带父文件夹信息的文件项
  */
 @Composable
-private fun RecentFileItemRow(item: RecentFileWithFolderInfo) {
-    // 根据文件类型选择图标和颜色
-    val isTxt    = item.file.type == FileType.Txt
-    val iconBg   = if (isTxt) IconBgBlue else IconBgPink
-    val iconTint = if (isTxt) IconBlue  else IconPink
-    val icon     = if (isTxt) Icons.Default.Description else Icons.Default.OndemandVideo
-    val typeLabel = if (isTxt) "文档" else "视频"
+private fun RecentFileItemRow(
+    item: RecentFileWithFolderInfo,
+    onOpenVideo: (String, String, String) -> Unit,
+    onOpenTxt: (String, String, String) -> Unit,
+) {
+    val (icon, iconBg, iconTint) = remember(item.file.type) { fileStyle(item.file.type) }
+    val clickAction = when (item.file.type) {
+        FileType.Video -> {
+            { onOpenVideo(item.file.id, item.file.name, item.file.uri ?: "") }
+        }
+        FileType.Txt -> {
+            { onOpenTxt(item.file.id, item.file.name, item.file.uri ?: "") }
+        }
+        else -> null
+    }
+    val typeLabel = when (item.file.type) {
+        FileType.Video -> "视频"
+        FileType.Txt -> "文档"
+        FileType.Folder -> "文件夹"
+        FileType.Other -> "其他"
+    }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { /* TODO: 点击跳转到文件详情 */ }
+            .clickable(enabled = clickAction != null) { clickAction?.invoke() }
             .padding(vertical = 2.w.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 图标容器
-        Box(
-            modifier = Modifier
-                .size(44.w.dp)
-                .clip(RoundedCornerShape(12.w.dp))
-                .background(iconBg),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = iconTint,
-                modifier = Modifier.size(22.w.dp)
+        if (item.file.type == FileType.Video && !item.file.coverUri.isNullOrEmpty()) {
+            VideoCoverThumbnail(
+                coverUri = item.file.coverUri,
+                modifier = Modifier.size(44.w.dp),
+                cornerRadiusDp = 12,
+                showPlayIcon = false,
             )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(44.w.dp)
+                    .clip(RoundedCornerShape(12.w.dp))
+                    .background(iconBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(22.w.dp)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(14.w.dp))
