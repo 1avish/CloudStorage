@@ -1,6 +1,5 @@
 package com.bytedance.cloudstorage.navigation
 
-import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -68,42 +67,23 @@ object Screen {
 }
 
 // ────────────────────────────────────────────────
-// 应用导航图（含 deeplink 处理）
+// 应用导航图（含剪贴板分享链接检测）
 // ────────────────────────────────────────────────
 
 /**
  * 应用顶层导航图。
  *
- * 支持两种方式进入分享文件列表页：
- * 1. **Deeplink** — 外部通过 cloudstorage://share/<token> 打开，由 [MainActivity] 传入
- * 2. **剪贴板检测** — [CopiedShareLinkObserver] 在应用回到前台时扫描剪贴板
+ * 通过 [CopiedShareLinkObserver] 在应用回到前台时扫描剪贴板，
+ * 检测到分享链接后弹窗引导用户进入分享文件列表页。
  *
- * @param navController       导航控制器
- * @param deepLinkUri         Activity 启动或 onNewIntent 收到的 deeplink URI
- * @param onDeepLinkConsumed  deeplink 消费后回调，用于清空 MainActivity 中的状态
+ * @param navController  导航控制器
  */
 @OptIn(UnstableApi::class)
 @Composable
 fun AppNavGraph(
     navController: NavHostController,
-    deepLinkUri: Uri? = null,
-    onDeepLinkConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val shareLinkStore = remember(context) { ShareLinkStore(context) }
-
-    // ── Deeplink 处理：cloudstorage://share/<token> → 跳转分享文件列表页 ──
-    LaunchedEffect(deepLinkUri) {
-        val token = ShareLinkStore.parseToken(deepLinkUri)
-        if (token != null) {
-            shareLinkStore.markHandled(token, ShareLinkHandledAction.Opened)
-            navController.navigate(Screen.shareList(token))
-        }
-        // 消费后清空，避免重复导航
-        if (deepLinkUri != null) {
-            onDeepLinkConsumed()
-        }
-    }
 
     // ── 剪贴板分享链接检测 ──
     CopiedShareLinkObserver(navController = navController)

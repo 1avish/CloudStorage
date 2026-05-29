@@ -26,17 +26,6 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <!-- Deeplink：cloudstorage://share/<token> → 分享文件列表页 -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:host="share"
-                    android:scheme="cloudstorage" />
-            </intent-filter>
         </activity>
     </application>
 
