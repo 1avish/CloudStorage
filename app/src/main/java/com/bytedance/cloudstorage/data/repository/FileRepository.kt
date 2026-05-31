@@ -5,8 +5,10 @@ import com.bytedance.cloudstorage.data.local.entity.FileEntity
 import com.bytedance.cloudstorage.data.mapper.FileMapper
 import com.bytedance.cloudstorage.data.remote.datasource.FileRemoteDataSource
 import com.bytedance.cloudstorage.domain.model.CloudFile
+import com.bytedance.cloudstorage.domain.model.FileType
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 
 /** 文件夹父级信息，供首页「位置」字段展示 */
 data class FolderInfo(
@@ -149,6 +151,126 @@ class FileRepository(
      */
     suspend fun findFolderIdByName(name: String, parentId: String?): String? =
         fileDao.findFolderIdByName(name, parentId)
+
+    /**
+     * 根据文件 ID 列表批量查询文件，保持传入顺序返回。
+     * ID 不存在或已删除的文件会被过滤掉。
+     */
+    suspend fun getFilesByIds(fileIds: List<String>): List<CloudFile> {
+        if (fileIds.isEmpty()) return emptyList()
+        val entitiesById = fileDao.getFilesByIds(fileIds).associateBy { it.fileId }
+        return fileIds.mapNotNull { id -> entitiesById[id]?.let(FileMapper::toDomain) }
+    }
+
+    /**
+     * 一次性获取指定父目录下的文件列表（挂起版本），用于复制文件树等场景。
+     */
+    suspend fun getFilesByParent(parentId: String?): List<CloudFile> =
+        fileDao.getFilesByParentOnce(parentId).map(FileMapper::toDomain)
+
+    /**
+     * 将指定 ID 的文件复制到当前用户网盘根目录。
+     *
+     * 文件夹会递归复制整棵子树，重名文件自动追加编号后缀（如 "视频(1).mp4"）。
+     *
+     * @param fileIds 源文件 ID 列表（来自分享链接）
+     * @return 成功复制的根级文件数量
+     */
+    suspend fun saveFilesToRoot(fileIds: List<String>): Int {
+        if (fileIds.isEmpty()) return 0
+        val sources = getFilesByIds(fileIds)
+        if (sources.isEmpty()) return 0
+
+        val now = System.currentTimeMillis()
+        val rootNames = getFilesByParent(null).map { it.name }.toMutableSet()
+        fileDao.runInTransaction {
+            sources.forEach { source ->
+                val savedName = generateUniqueName(source.name, rootNames)
+                rootNames += savedName
+                copyFileTree(
+                    source = source,
+                    targetName = savedName,
+                    targetParentId = null,
+                    savedAt = now,
+                )
+            }
+        }
+        return sources.size
+    }
+
+    /**
+     * 递归复制单个文件/文件夹到目标父目录，返回新创建的文件 ID。
+     *
+     * 对于文件夹类型，会遍历其所有子文件逐一递归复制。
+     */
+    private suspend fun copyFileTree(
+        source: CloudFile,
+        targetName: String,
+        targetParentId: String?,
+        savedAt: Long,
+    ): String {
+        val newId = UUID.randomUUID().toString()
+        val entity = FileEntity(
+            fileId = newId,
+            name = targetName,
+            size = source.size,
+            uri = source.uri,
+            coverUri = source.coverUri,
+            type = source.type.toEntityType(),
+            parentId = targetParentId,
+            createdAt = savedAt,
+            updatedAt = savedAt,
+            lastSavedAt = savedAt,
+        )
+        fileDao.insertFiles(listOf(entity))
+
+        if (source.type == FileType.Folder) {
+            getFilesByParent(source.id).forEach { child ->
+                copyFileTree(
+                    source = child,
+                    targetName = child.name,
+                    targetParentId = newId,
+                    savedAt = savedAt,
+                )
+            }
+        }
+        return newId
+    }
+
+    /**
+     * 生成唯一文件名：重名时追加 "(1)"、"(2)" 等编号后缀，保留原始扩展名。
+     */
+    private fun generateUniqueName(desiredName: String, existingNames: Set<String>): String {
+        if (desiredName !in existingNames) return desiredName
+
+        val dotIndex = desiredName.lastIndexOf('.')
+        val baseName: String
+        val extension: String
+        if (dotIndex > 0) {
+            baseName = desiredName.substring(0, dotIndex)
+            extension = desiredName.substring(dotIndex)
+        } else {
+            baseName = desiredName
+            extension = ""
+        }
+
+        var counter = 1
+        var candidate: String
+        do {
+            candidate = "${baseName}(${counter})$extension"
+            counter++
+        } while (candidate in existingNames)
+
+        return candidate
+    }
+
+    /** [FileType] → 数据库 type 字段字符串映射 */
+    private fun FileType.toEntityType(): String = when (this) {
+        FileType.Folder -> "folder"
+        FileType.Video -> "video"
+        FileType.Txt -> "txt"
+        FileType.Other -> "other"
+    }
 
     /**
      * 创建新文件夹

@@ -1,4 +1,4 @@
-package com.bytedance.cloudstorage.presentation.filelist
+package com.bytedance.cloudstorage.presentation.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -35,24 +35,45 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bytedance.cloudstorage.domain.model.CloudFile
+import com.bytedance.cloudstorage.presentation.filelist.DividerColor
+import com.bytedance.cloudstorage.presentation.filelist.PrimaryBlue
+import com.bytedance.cloudstorage.presentation.filelist.TextPrimary
+import com.bytedance.cloudstorage.presentation.filelist.TextSecondary
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 
 // ────────────────────────────────────────────────
-// 底部弹窗：重命名文件
+// 通用文本输入底部弹窗
 // ────────────────────────────────────────────────
 
+/**
+ * 通用文本输入 BottomSheet 组件。
+ *
+ * 用于新建文件夹命名、文件重命名等场景，替换原先独立的
+ * [FileListNewFolderSheet] 和 [FileListRenameSheet]。
+ *
+ * 自动聚焦输入框，键盘 Done 键或点击「确认」按钮触发回调。
+ * 点击弹窗背景空白区域可收起键盘。
+ *
+ * @param title       弹窗标题，如「新建文件夹」「重命名」
+ * @param placeholder 输入框占位文字
+ * @param initialValue 初始值，重命名场景传入原名
+ * @param onDismiss   取消/关闭回调
+ * @param onConfirm   确认回调，返回去除首尾空格后的文本
+ */
 @Composable
-internal fun RenameBottomSheet(
-    file: CloudFile,
+internal fun TextInputBottomSheet(
+    title: String,
+    placeholder: String,
+    initialValue: String = "",
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var fileName by remember { mutableStateOf(file.name) }
+    var inputValue by remember(initialValue) { mutableStateOf(initialValue) }
     val focusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
 
+    // 弹窗打开后自动聚焦输入框
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
     }
@@ -63,11 +84,13 @@ internal fun RenameBottomSheet(
             .background(Color.White)
             .padding(horizontal = 20.w.dp)
             .padding(bottom = 32.w.dp)
+            // 点击空白区域收起键盘
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
             ) { focusManager.clearFocus() }
     ) {
+        // 顶部拖拽指示条
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -82,14 +105,16 @@ internal fun RenameBottomSheet(
             )
         }
 
+        // 标题
         Text(
-            text = "重命名",
+            text = title,
             fontSize = 20.ws.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary,
             modifier = Modifier.padding(top = 8.w.dp, bottom = 20.w.dp)
         )
 
+        // 输入框区域：占位文字 + BasicTextField 叠放
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -99,16 +124,17 @@ internal fun RenameBottomSheet(
                 .padding(horizontal = 14.w.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            if (fileName.isEmpty()) {
+            // 输入为空时显示占位文字
+            if (inputValue.isEmpty()) {
                 Text(
-                    text = "请输入新文件名",
+                    text = placeholder,
                     fontSize = 15.ws.sp,
                     color = TextSecondary
                 )
             }
             BasicTextField(
-                value = fileName,
-                onValueChange = { fileName = it },
+                value = inputValue,
+                onValueChange = { inputValue = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
@@ -119,17 +145,20 @@ internal fun RenameBottomSheet(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = {
-                    if (fileName.isNotBlank()) onConfirm(fileName.trim())
+                    // 键盘 Done 键：内容非空时触发确认
+                    if (inputValue.isNotBlank()) onConfirm(inputValue.trim())
                 })
             )
         }
 
         Spacer(modifier = Modifier.height(24.w.dp))
 
+        // 取消 / 确认 双按钮
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.w.dp)
         ) {
+            // 取消按钮
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -147,14 +176,15 @@ internal fun RenameBottomSheet(
                 )
             }
 
+            // 确认按钮：输入为空时文字半透明提示不可用
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(44.w.dp)
                     .clip(RoundedCornerShape(8.w.dp))
-                    .background(Color(0xFF3370FF))
-                    .clickable(enabled = fileName.isNotBlank()) {
-                        onConfirm(fileName.trim())
+                    .background(PrimaryBlue)
+                    .clickable(enabled = inputValue.isNotBlank()) {
+                        onConfirm(inputValue.trim())
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -162,7 +192,7 @@ internal fun RenameBottomSheet(
                     text = "确认",
                     fontSize = 16.ws.sp,
                     fontWeight = FontWeight.Medium,
-                    color = if (fileName.isNotBlank()) Color.White
+                    color = if (inputValue.isNotBlank()) Color.White
                     else Color.White.copy(alpha = 0.5f)
                 )
             }

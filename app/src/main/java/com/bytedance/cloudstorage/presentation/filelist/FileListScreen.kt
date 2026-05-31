@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -52,8 +53,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.bytedance.cloudstorage.data.share.ShareLinkHandledAction
 import com.bytedance.cloudstorage.domain.model.CloudFile
 import com.bytedance.cloudstorage.domain.model.FileType
+import com.bytedance.cloudstorage.presentation.common.TextInputBottomSheet
+import com.bytedance.cloudstorage.presentation.share.ShareLinkPromptDialog
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 
@@ -66,7 +70,8 @@ import com.bytedance.cloudstorage.utils.ws
 fun FileListScreen(
     viewModel: FileListViewModel = viewModel(),
     onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
-    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> }
+    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> },
+    onOpenShareLink: (String) -> Unit = {},
 ) {
     val files by viewModel.files.collectAsStateWithLifecycle()
     val atRoot by viewModel.atRoot.collectAsStateWithLifecycle()
@@ -75,10 +80,12 @@ fun FileListScreen(
     val selectedFiles by viewModel.selectedFiles.collectAsStateWithLifecycle()
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
     var showCreateSheet by remember { mutableStateOf(false) }
+    var showSaveShareSheet by remember { mutableStateOf(false) } // 输入分享链接弹窗
     var showNewFolderSheet by remember { mutableStateOf(false) }
     var renameTargetFile by remember { mutableStateOf<CloudFile?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
+    var copiedShareToken by remember { mutableStateOf<String?>(null) } // 创建分享链接后触发提示弹窗
     val sortType by viewModel.sortType.collectAsStateWithLifecycle()
     val sortDirection by viewModel.sortDirection.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
@@ -89,6 +96,29 @@ fun FileListScreen(
     ) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         uploadSelectedFile(context, uri, viewModel, files)
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.createdShareLink.collect { link ->
+            if (link == null) {
+                Toast.makeText(context, "请先选择文件", Toast.LENGTH_SHORT).show()
+            } else {
+                copiedShareToken = link.token
+                Toast.makeText(context, "分享链接已复制", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.shareTokenLookupResult.collect { token ->
+            if (token == null) {
+                Toast.makeText(context, "分享链接不存在", Toast.LENGTH_SHORT).show()
+            } else {
+                viewModel.markShareLinkHandled(token, ShareLinkHandledAction.Opened)
+                showSaveShareSheet = false
+                onOpenShareLink(token)
+            }
+        }
     }
 
     // ── 系统返回键：选择模式下退出选择，否则返回上一级 ──
@@ -307,7 +337,8 @@ fun FileListScreen(
                         Toast.makeText(context, "下载功能（待实现）", Toast.LENGTH_SHORT).show()
                     },
                     onShare = {
-                        Toast.makeText(context, "分享功能（待实现）", Toast.LENGTH_SHORT).show()
+                        // 创建分享链接 → 复制到剪贴板 → 弹出提示弹窗
+                        viewModel.createShareLink()
                     },
                     onDelete = {
                         showDeleteConfirm = true
@@ -332,6 +363,11 @@ fun FileListScreen(
         ) {
             BottomSheetContent(
                 onDismiss = { showCreateSheet = false },
+                onSaveShare = {
+                    // 「保存分享」→ 关闭创建弹窗，打开输入分享链接弹窗
+                    showCreateSheet = false
+                    showSaveShareSheet = true
+                },
                 onNewFolder = {
                     showCreateSheet = false
                     showNewFolderSheet = true
@@ -348,6 +384,26 @@ fun FileListScreen(
         }
     }
 
+    // ── 保存分享弹窗：输入分享链接后解析 token 并跳转 ──
+    if (showSaveShareSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSaveShareSheet = false },
+            sheetState = sheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            dragHandle = null
+        ) {
+            TextInputBottomSheet(
+                title = "保存分享",
+                placeholder = "请输入分享链接",
+                onDismiss = { showSaveShareSheet = false },
+                onConfirm = { link ->
+                    viewModel.findExistingShareToken(link)
+                }
+            )
+        }
+    }
+
     if (showNewFolderSheet) {
         ModalBottomSheet(
             onDismissRequest = { showNewFolderSheet = false },
@@ -356,7 +412,9 @@ fun FileListScreen(
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
             dragHandle = null
         ) {
-            NewFolderBottomSheet(
+            TextInputBottomSheet(
+                title = "新建文件夹",
+                placeholder = "请输入文件夹名",
                 onDismiss = { showNewFolderSheet = false },
                 onConfirm = { name ->
                     val uniqueName = generateUniqueName(name, files.map { it.name }.toSet())
@@ -376,11 +434,14 @@ fun FileListScreen(
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
             dragHandle = null
         ) {
-            RenameBottomSheet(
-                file = renameTargetFile!!,
+            TextInputBottomSheet(
+                title = "重命名",
+                placeholder = "请输入新文件名",
+                initialValue = renameTargetFile!!.name,
                 onDismiss = { renameTargetFile = null },
                 onConfirm = { newName ->
-                    val existingNames = files.filter { it.id != renameTargetFile!!.id }.map { it.name }.toSet()
+                    val existingNames =
+                        files.filter { it.id != renameTargetFile!!.id }.map { it.name }.toSet()
                     val uniqueName = generateUniqueName(newName, existingNames)
                     viewModel.renameFile(renameTargetFile!!.id, uniqueName)
                     renameTargetFile = null
@@ -408,5 +469,21 @@ fun FileListScreen(
                 }
             )
         }
+    }
+
+    // ── 分享链接创建成功后弹出提示弹窗 ──
+    copiedShareToken?.let { token ->
+        ShareLinkPromptDialog(
+            onDismiss = {
+                viewModel.markShareLinkHandled(token, ShareLinkHandledAction.Dismissed)
+                copiedShareToken = null
+            },
+            onViewNow = {
+                viewModel.markShareLinkHandled(token, ShareLinkHandledAction.Opened)
+                copiedShareToken = null
+                viewModel.exitSelectionMode()
+                onOpenShareLink(token)
+            }
+        )
     }
 }

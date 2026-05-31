@@ -22,7 +22,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen(
     onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
-    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> }
+    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> },
+    onOpenShareLink: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -80,7 +81,8 @@ fun MainScreen(
                 1 -> FileListScreen(
                     viewModel = fileListViewModel,
                     onOpenVideo = onOpenVideo,
-                    onOpenTxt = onOpenTxt
+                    onOpenTxt = onOpenTxt,
+                    onOpenShareLink = onOpenShareLink
                 )
             }
         }

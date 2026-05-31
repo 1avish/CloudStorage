@@ -7,7 +7,10 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bytedance.cloudstorage.data.local.dao.FileDao
+import com.bytedance.cloudstorage.data.local.dao.ShareLinkDao
 import com.bytedance.cloudstorage.data.local.entity.FileEntity
+import com.bytedance.cloudstorage.data.local.entity.ShareLinkEntity
+import com.bytedance.cloudstorage.data.local.entity.ShareLinkFileEntity
 
 /**
  * Room 数据库类
@@ -18,11 +21,20 @@ import com.bytedance.cloudstorage.data.local.entity.FileEntity
  * Room 会在编译期自动生成 AppDatabase_Impl 实现类，
  * 包含建表 SQL 和 DAO 方法的具体实现。
  */
-@Database(entities = [FileEntity::class], version = 2, exportSchema = false)
+@Database(
+    entities = [
+        FileEntity::class,
+        ShareLinkEntity::class,
+        ShareLinkFileEntity::class,
+    ],
+    version = 3,
+    exportSchema = false
+)
 abstract class AppDatabase : RoomDatabase() {
 
     /** 提供 FileDao 实例，Room 自动生成实现 */
     abstract fun fileDao(): FileDao
+    abstract fun shareLinkDao(): ShareLinkDao
 
     companion object {
         /**
@@ -40,6 +52,31 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS share_links (
+                        token TEXT NOT NULL PRIMARY KEY,
+                        createdAt INTEGER NOT NULL,
+                        handledAt INTEGER,
+                        handledAction TEXT,
+                        isDeleted INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS share_link_files (
+                        token TEXT NOT NULL,
+                        fileId TEXT NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        PRIMARY KEY(token, fileId),
+                        FOREIGN KEY(token) REFERENCES share_links(token) ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_share_link_files_token ON share_link_files(token)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_share_link_files_fileId ON share_link_files(fileId)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -47,7 +84,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "miniclouddisk.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }

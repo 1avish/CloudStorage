@@ -34,12 +34,13 @@ import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 
 // ────────────────────────────────────────────────
-// 底部弹窗：离线下载 + 上传文件
+// 底部弹窗：保存分享 + 新建文件夹 + 上传文件
 // ────────────────────────────────────────────────
 
 @Composable
 internal fun BottomSheetContent(
     onDismiss: () -> Unit,
+    onSaveShare: () -> Unit = {},
     onNewFolder: () -> Unit = {},
     onUploadVideo: () -> Unit = {},
     onUploadDoc: () -> Unit = {},
@@ -66,9 +67,9 @@ internal fun BottomSheetContent(
             )
         }
 
-        // ── 离线下载 ──
+        // ── 保存分享 ──
         Text(
-            text = "离线下载",
+            text = "保存分享",
             fontSize = 20.ws.sp,
             fontWeight = FontWeight.Bold,
             color = TextPrimary,
@@ -80,7 +81,7 @@ internal fun BottomSheetContent(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.w.dp))
                 .background(Color(0xFFF5F7FA))
-                .clickable { onDismiss() }
+                .clickable { onSaveShare() }
                 .padding(horizontal = 16.w.dp, vertical = 16.w.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -103,7 +104,7 @@ internal fun BottomSheetContent(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "添加磁力链",
+                    text = "输入分享链接",
                     fontSize = 16.ws.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
