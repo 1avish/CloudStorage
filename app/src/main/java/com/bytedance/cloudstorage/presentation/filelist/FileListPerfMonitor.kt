@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicLong
 object FileListPerfMonitor {
 
     private const val TAG = "FileListPerf"
+    // 调试日志开关：设为 true 打开性能日志，false 关闭
+    private const val DEBUG_PERF_LOG = false
 
     // ── 帧耗时 ──
     private val frameCount = AtomicInteger(0)
@@ -55,11 +57,11 @@ object FileListPerfMonitor {
                     frameMs > 32 -> {
                         severeJankCount.incrementAndGet()
                         jankCount.incrementAndGet()
-                        Log.w(TAG, "严重卡顿帧: ${frameMs}ms")
+                        if (DEBUG_PERF_LOG) Log.w(TAG, "严重卡顿帧: ${frameMs}ms")
                     }
                     frameMs > 16 -> {
                         jankCount.incrementAndGet()
-                        Log.w(TAG, "卡顿帧: ${frameMs}ms")
+                        if (DEBUG_PERF_LOG) Log.w(TAG, "卡顿帧: ${frameMs}ms")
                     }
                 }
             }
@@ -74,7 +76,7 @@ object FileListPerfMonitor {
         if (isRunning) return
         isRunning = true
         reset()
-        Log.i(TAG, "========== 性能监测开始 ==========")
+        if (DEBUG_PERF_LOG) Log.i(TAG, "========== 性能监测开始 ==========")
         Choreographer.getInstance().postFrameCallback(frameCallback)
     }
 
@@ -100,6 +102,8 @@ object FileListPerfMonitor {
     // ────────────────────────────────────────────────
 
     private fun printSummary() {
+        if (!DEBUG_PERF_LOG) return
+
         val total = frameCount.get()
         val jank = jankCount.get()
         val severe = severeJankCount.get()

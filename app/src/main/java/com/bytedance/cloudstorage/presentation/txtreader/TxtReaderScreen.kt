@@ -2,6 +2,9 @@ package com.bytedance.cloudstorage.presentation.txtreader
 
 import android.content.Context
 import android.net.Uri
+import android.os.Debug
+import android.os.SystemClock
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -51,6 +54,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.StringReader
+import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -63,11 +67,56 @@ private val ReaderSubText = Color(0xFF8B919E)
 private val ReaderBlue = Color(0xFF3370FF)
 
 // 每次从文件读取的缓冲区大小（16KB），影响 I/O 次数
+// 调试日志开关：设为 true 打开分页性能日志，false 关闭
+private const val DEBUG_READER_LOG = false
+
 private const val READ_BUFFER_SIZE = 16 * 1024
 
 // 每个文本分段的最大字符数（8KB），分段送给 TextMeasurer 测量
 // 越大测量越准（减少跨段边界误差），但单次测量越慢
 private const val MAX_SEGMENT_CHARS = 8 * 1024
+private const val READER_METRICS_TAG = "TxtReaderMetrics"
+private const val LOG_PROGRESS_PAGE_INTERVAL = 50
+
+private fun logReaderMetric(
+    event: String,
+    fileName: String,
+    pages: Int,
+    startMs: Long,
+    extra: String = "",
+) {
+    val elapsedMs = (SystemClock.elapsedRealtime() - startMs).coerceAtLeast(0L)
+    val elapsedSeconds = elapsedMs / 1000.0
+    val pagesPerSecond = if (elapsedSeconds > 0.0) pages / elapsedSeconds else 0.0
+
+    val runtime = Runtime.getRuntime()
+    val usedHeapMb = bytesToMb(runtime.totalMemory() - runtime.freeMemory())
+    val maxHeapMb = bytesToMb(runtime.maxMemory())
+    val memoryInfo = Debug.MemoryInfo()
+    Debug.getMemoryInfo(memoryInfo)
+    val pssMb = memoryInfo.totalPss / 1024.0
+
+    Log.d(
+        READER_METRICS_TAG,
+        buildString {
+            append("event=").append(event)
+            append(" file=\"").append(fileName).append("\"")
+            append(" elapsed_ms=").append(elapsedMs)
+            append(" pages=").append(pages)
+            append(" pages_per_second=").append(formatDouble(pagesPerSecond))
+            append(" java_heap_mb=").append(formatDouble(usedHeapMb))
+            append(" max_heap_mb=").append(formatDouble(maxHeapMb))
+            append(" pss_mb=").append(formatDouble(pssMb))
+            if (extra.isNotBlank()) {
+                append(' ').append(extra)
+            }
+        }
+    )
+}
+
+private fun bytesToMb(bytes: Long): Double = bytes / 1024.0 / 1024.0
+
+private fun formatDouble(value: Double): String = String.format(Locale.US, "%.2f", value)
 
 // ── TXT 阅读器入口 ──
 
@@ -216,6 +265,21 @@ private fun TxtPagerContent(
                     pagerState.scrollToPage(0)
                 }
 
+                val paginationStartMs: Long
+                var firstPageLogged = false
+                if (DEBUG_READER_LOG) {
+                    paginationStartMs = SystemClock.elapsedRealtime()
+                    logReaderMetric(
+                        event = "start",
+                        fileName = fileName,
+                        pages = 0,
+                        startMs = paginationStartMs,
+                        extra = "width_px=$contentWidthPx max_lines_per_page=$maxLines"
+                    )
+                } else {
+                    paginationStartMs = 0L
+                }
+
                 runCatching {
                     withContext(Dispatchers.Default) {
                         paginateTxtStream(
@@ -230,11 +294,36 @@ private fun TxtPagerContent(
                             // 每算完一页，切回主线程更新 UI
                             withContext(Dispatchers.Main.immediate) {
                                 pages.add(pageText)
+                                if (DEBUG_READER_LOG && !firstPageLogged) {
+                                    firstPageLogged = true
+                                    logReaderMetric(
+                                        event = "first_page",
+                                        fileName = fileName,
+                                        pages = pages.size,
+                                        startMs = paginationStartMs
+                                    )
+                                } else if (DEBUG_READER_LOG && pages.size % LOG_PROGRESS_PAGE_INTERVAL == 0) {
+                                    logReaderMetric(
+                                        event = "progress",
+                                        fileName = fileName,
+                                        pages = pages.size,
+                                        startMs = paginationStartMs
+                                    )
+                                }
                             }
                         }
                     }
                 }.onFailure { throwable ->
                     errorMessage = throwable.message ?: "文本读取失败"
+                    if (DEBUG_READER_LOG) {
+                        logReaderMetric(
+                            event = "error",
+                            fileName = fileName,
+                            pages = pages.size,
+                            startMs = paginationStartMs,
+                            extra = "message=${throwable.message.orEmpty()}"
+                        )
+                    }
                 }
 
                 // 兜底：文件为空时至少显示一页
@@ -242,6 +331,14 @@ private fun TxtPagerContent(
                     pages.add(" ")
                 }
                 isPaginating = false
+                if (errorMessage == null && DEBUG_READER_LOG) {
+                    logReaderMetric(
+                        event = "complete",
+                        fileName = fileName,
+                        pages = pages.size,
+                        startMs = paginationStartMs
+                    )
+                }
                 // 防止当前页码越界
                 if (pagerState.currentPage >= pages.size) {
                     pagerState.scrollToPage((pages.lastIndex).coerceAtLeast(0))
@@ -436,9 +533,12 @@ private suspend fun paginateSegment(
         val lastLineIndex = lineIndex + linesToTake - 1
 
         // 取这一批行在 segment 中的字符范围
-        val segmentEnd = layout
-            .getLineEnd(lastLineIndex, visibleEnd = false)
-            .coerceIn(segmentStart + 1, segment.length)
+        if (segmentStart >= segment.length) break
+        val rawSegmentEnd = layout.getLineEnd(lastLineIndex, visibleEnd = false)
+        val segmentEnd = when {
+            rawSegmentEnd <= segmentStart -> (segmentStart + 1).coerceAtMost(segment.length)
+            else -> rawSegmentEnd.coerceAtMost(segment.length)
+        }
 
         pageAccumulator.append(
             segment = segment,
