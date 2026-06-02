@@ -339,4 +339,14 @@ class FileRepository(
     suspend fun renameFile(fileId: String, newName: String) {
         fileDao.renameFile(fileId, newName, System.currentTimeMillis())
     }
+
+    /**
+     * 批量移动文件到目标文件夹
+     *
+     * @param ids 待移动的文件 ID 列表
+     * @param targetParentId 目标父文件夹 ID，null 表示移动到根目录
+     */
+    suspend fun moveFiles(ids: List<String>, targetParentId: String?) {
+        fileDao.moveFiles(ids, targetParentId, System.currentTimeMillis())
+    }
 }

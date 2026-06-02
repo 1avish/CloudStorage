@@ -10,6 +10,7 @@ import com.bytedance.cloudstorage.data.share.CreatedShareLink
 import com.bytedance.cloudstorage.data.share.ShareLinkHandledAction
 import com.bytedance.cloudstorage.data.share.ShareLinkStore
 import com.bytedance.cloudstorage.domain.model.CloudFile
+import com.bytedance.cloudstorage.domain.model.FileType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -127,6 +128,19 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         .map { it.size }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    // ── 文件移动 ──
+    /** 是否显示移动目标文件夹选择器 */
+    private val _showMoveSheet = MutableStateFlow(false)
+    val showMoveSheet: StateFlow<Boolean> = _showMoveSheet.asStateFlow()
+    /** 移动目标文件夹 ID（null = 根目录） */
+    private val _moveTargetFolderId = MutableStateFlow<String?>(null)
+    /** 移动目标文件夹路径面包屑（从根到当前层级的名称列表） */
+    private val _moveTargetPathStack = MutableStateFlow<List<String>>(emptyList())
+    val moveTargetPathStack: StateFlow<List<String>> = _moveTargetPathStack.asStateFlow()
+    /** 目标文件夹下的子文件夹列表（供选择器展示，排除已选中的文件） */
+    private val _moveTargetFolders = MutableStateFlow<List<CloudFile>>(emptyList())
+    val moveTargetFolders: StateFlow<List<CloudFile>> = _moveTargetFolders.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -303,6 +317,84 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
             shareLinkStore.markHandled(token, action)
         }
     }
+
+    /** 打开移动目标选择器，重置到根目录 */
+    fun openMoveSheet() {
+        _showMoveSheet.value = true
+        _moveTargetFolderId.value = null
+        _moveTargetPathStack.value = emptyList()
+        loadMoveTargetFolders(null)
+    }
+
+    /** 关闭移动目标选择器 */
+    fun closeMoveSheet() {
+        _showMoveSheet.value = false
+    }
+
+    /** 重新打开移动目标选择器（新建文件夹后返回时使用） */
+    fun reopenMoveSheet() {
+        _showMoveSheet.value = true
+        loadMoveTargetFolders(_moveTargetFolderId.value)
+    }
+
+    /** 在移动目标选择器中进入子文件夹 */
+    fun navigateMoveIntoFolder(folderId: String, folderName: String) {
+        _moveTargetPathStack.value = _moveTargetPathStack.value + folderName
+        _moveTargetFolderId.value = folderId
+        loadMoveTargetFolders(folderId)
+    }
+
+    /** 在移动目标选择器中返回上一级 */
+    fun navigateMoveBack() {
+        val stack = _moveTargetPathStack.value
+        if (stack.isEmpty()) return
+        navigateMoveToPathIndex(stack.size - 1)
+    }
+
+    /** 在移动目标选择器中跳转到面包屑指定层级（index = 0 表示根目录） */
+    fun navigateMoveToPathIndex(index: Int) {
+        val stack = _moveTargetPathStack.value
+        if (index > stack.size) return
+        val newStack = stack.take(index)
+        _moveTargetPathStack.value = newStack
+        viewModelScope.launch {
+            val newParentId = if (newStack.isEmpty()) null else findFolderIdByPath(newStack)
+            _moveTargetFolderId.value = newParentId
+            loadMoveTargetFolders(newParentId)
+        }
+    }
+
+    /** 加载指定目录下的子文件夹列表，自动排除当前已选中的文件 */
+    private fun loadMoveTargetFolders(parentId: String?) {
+        viewModelScope.launch {
+            val selectedIds = _selectedFileIds.value
+            _moveTargetFolders.value = repository.getFilesByParent(parentId)
+                .filter { it.type == FileType.Folder && it.id !in selectedIds }
+        }
+    }
+
+    /** 在移动目标目录下新建文件夹（重名时自动追加编号） */
+    fun createFolderInMoveTarget(name: String) {
+        viewModelScope.launch {
+            val targetId = _moveTargetFolderId.value
+            val existingNames = repository.getFilesByParent(targetId).map { it.name }.toSet()
+            repository.createFolder(generateUniqueName(name, existingNames), targetId)
+            loadMoveTargetFolders(targetId)
+        }
+    }
+
+    /** 确认移动：将已选文件移至当前目标文件夹，然后退出选择模式 */
+    fun confirmMove() {
+        val ids = _selectedFileIds.value.toList()
+        val targetId = _moveTargetFolderId.value
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.moveFiles(ids, targetId)
+            exitSelectionMode()
+            _showMoveSheet.value = false
+        }
+    }
+
 
     // ── 内部类型与方法 ──
 

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.HorizontalDivider
@@ -47,12 +48,27 @@ import com.bytedance.cloudstorage.utils.ws
 // 底部操作栏：非模态版本（选择模式下固定在底部，不遮挡背景）
 // ────────────────────────────────────────────────
 
+/**
+ * 选择模式底部操作栏
+ *
+ * 顶部横滑展示已选文件标签，底部排列操作按钮（下载、分享、删除、移动、重命名）。
+ * 重命名在多选状态下禁用，仅单选时可用。
+ *
+ * @param selectedFiles 当前已选中的文件列表
+ * @param onDownload    下载回调
+ * @param onShare       分享回调
+ * @param onDelete      删除回调
+ * @param onMove        移动回调（打开移动目标选择器）
+ * @param onRename      重命名回调（传入选中的文件）
+ * @param onToggleFile  取消选中回调（传入文件 ID）
+ */
 @Composable
 internal fun FileActionBar(
     selectedFiles: List<CloudFile>,
     onDownload: () -> Unit,
     onShare: () -> Unit,
     onDelete: () -> Unit,
+    onMove: () -> Unit,
     onRename: (CloudFile) -> Unit,
     onToggleFile: (String) -> Unit,
 ) {
@@ -108,6 +124,13 @@ internal fun FileActionBar(
                 iconTint = Color(0xFFFF3B30),
                 bgColor = Color(0xFFFFEBEE),
                 onClick = onDelete
+            )
+            ActionButton(
+                icon = Icons.Default.DriveFileMove,
+                label = "移动",
+                iconTint = Color(0xFFFFEB5A),
+                bgColor = Color(0xFFFFFAE9),
+                onClick = onMove
             )
             ActionButton(
                 icon = Icons.Default.Edit,
