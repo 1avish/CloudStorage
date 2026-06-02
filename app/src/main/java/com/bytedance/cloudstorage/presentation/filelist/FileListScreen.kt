@@ -78,10 +78,16 @@ fun FileListScreen(
     val selectedFileIds by viewModel.selectedFileIds.collectAsStateWithLifecycle()
     val isSelectionMode by viewModel.isSelectionMode.collectAsStateWithLifecycle()
     val selectedFiles by viewModel.selectedFiles.collectAsStateWithLifecycle()
+    // ── 移动目标选择器状态 ──
+    val showMoveSheet by viewModel.showMoveSheet.collectAsStateWithLifecycle()
+    val moveTargetPathStack by viewModel.moveTargetPathStack.collectAsStateWithLifecycle()
+    val moveTargetFolders by viewModel.moveTargetFolders.collectAsStateWithLifecycle()
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
     var showCreateSheet by remember { mutableStateOf(false) }
     var showSaveShareSheet by remember { mutableStateOf(false) } // 输入分享链接弹窗
     var showNewFolderSheet by remember { mutableStateOf(false) }
+    /** 标记当前新建文件夹是否来自移动选择器（用于返回后重新打开选择器） */
+    var isCreatingMoveTargetFolder by remember { mutableStateOf(false) }
     var renameTargetFile by remember { mutableStateOf<CloudFile?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showSortMenu by remember { mutableStateOf(false) }
@@ -89,6 +95,7 @@ fun FileListScreen(
     val sortType by viewModel.sortType.collectAsStateWithLifecycle()
     val sortDirection by viewModel.sortDirection.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState()
+    val moveSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val context = LocalContext.current
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -343,6 +350,10 @@ fun FileListScreen(
                     onDelete = {
                         showDeleteConfirm = true
                     },
+                    onMove = {
+                        // 打开移动目标选择器
+                        viewModel.openMoveSheet()
+                    },
                     onRename = { file ->
                         viewModel.exitSelectionMode()
                         renameTargetFile = file
@@ -405,8 +416,16 @@ fun FileListScreen(
     }
 
     if (showNewFolderSheet) {
+        fun closeNewFolderSheet() {
+            showNewFolderSheet = false
+            if (isCreatingMoveTargetFolder) {
+                isCreatingMoveTargetFolder = false
+                viewModel.reopenMoveSheet()
+            }
+        }
+
         ModalBottomSheet(
-            onDismissRequest = { showNewFolderSheet = false },
+            onDismissRequest = { closeNewFolderSheet() },
             sheetState = sheetState,
             containerColor = Color.White,
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
@@ -415,11 +434,19 @@ fun FileListScreen(
             TextInputBottomSheet(
                 title = "新建文件夹",
                 placeholder = "请输入文件夹名",
-                onDismiss = { showNewFolderSheet = false },
+                onDismiss = { closeNewFolderSheet() },
                 onConfirm = { name ->
-                    val uniqueName = generateUniqueName(name, files.map { it.name }.toSet())
-                    viewModel.createFolder(uniqueName)
+                    if (isCreatingMoveTargetFolder) {
+                        viewModel.createFolderInMoveTarget(name)
+                    } else {
+                        val uniqueName = generateUniqueName(name, files.map { it.name }.toSet())
+                        viewModel.createFolder(uniqueName)
+                    }
                     showNewFolderSheet = false
+                    if (isCreatingMoveTargetFolder) {
+                        isCreatingMoveTargetFolder = false
+                        viewModel.reopenMoveSheet()
+                    }
                 }
             )
         }
@@ -467,6 +494,33 @@ fun FileListScreen(
                     showDeleteConfirm = false
                     Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
                 }
+            )
+        }
+    }
+
+    // ── 移动目标文件夹选择器弹窗 ──
+    if (showMoveSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.closeMoveSheet() },
+            sheetState = moveSheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+            dragHandle = null,
+        ) {
+            MoveFolderPickerSheet(
+                pathStack = moveTargetPathStack,
+                folders = moveTargetFolders,
+                onNavigateInto = { id, name -> viewModel.navigateMoveIntoFolder(id, name) },
+                onNavigateBack = { viewModel.navigateMoveBack() },
+                onPathClick = { index -> viewModel.navigateMoveToPathIndex(index) },
+                onConfirmMove = { viewModel.confirmMove() },
+                onDismiss = { viewModel.closeMoveSheet() },
+                onNewFolder = {
+                    // 标记来源为移动选择器，关闭后打开新建文件夹弹窗
+                    isCreatingMoveTargetFolder = true
+                    viewModel.closeMoveSheet()
+                    showNewFolderSheet = true
+                },
             )
         }
     }

@@ -274,4 +274,10 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         exoPlayer?.release()
         exoPlayer = null
     }
+
+    fun markFileOpened(id:String){
+        viewModelScope.launch { withContext(Dispatchers.IO){
+            fileDao.updateLastOpenedAt(id,System.currentTimeMillis())
+        } }
+    }
 }

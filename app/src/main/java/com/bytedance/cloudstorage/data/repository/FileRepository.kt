@@ -198,6 +198,14 @@ class FileRepository(
         return sources.size
     }
 
+   /** 记录文件被浏览（更新 lastOpenedAt） */
+    suspend fun markFileOpened(fileId: String){
+        fileDao.updateLastOpenedAt(fileId, System.currentTimeMillis())
+    }
+
+    /** 获取真实已用存储（字节） */
+    suspend fun getUsedStorageBytes(): Long = fileDao.getTotalUsedSize()
+
     /**
      * 递归复制单个文件/文件夹到目标父目录，返回新创建的文件 ID。
      *
@@ -338,5 +346,15 @@ class FileRepository(
     /** 重命名文件 */
     suspend fun renameFile(fileId: String, newName: String) {
         fileDao.renameFile(fileId, newName, System.currentTimeMillis())
+    }
+
+    /**
+     * 批量移动文件到目标文件夹
+     *
+     * @param ids 待移动的文件 ID 列表
+     * @param targetParentId 目标父文件夹 ID，null 表示移动到根目录
+     */
+    suspend fun moveFiles(ids: List<String>, targetParentId: String?) {
+        fileDao.moveFiles(ids, targetParentId, System.currentTimeMillis())
     }
 }

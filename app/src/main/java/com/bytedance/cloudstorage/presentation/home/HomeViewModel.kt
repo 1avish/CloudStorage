@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * 网盘首页 ViewModel
@@ -35,6 +36,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val usedStorageG: StateFlow<Float> = _usedStorageG.asStateFlow()
 
     private val _totalStorageG = MutableStateFlow(10f)
+    // 第37行，不用改，保持 10f 即可
     val totalStorageG: StateFlow<Float> = _totalStorageG.asStateFlow()
 
     private val _recentViews = MutableStateFlow<List<RecentFileWithFolderInfo>>(emptyList())
@@ -65,9 +67,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.initializeDataIfEmpty()
 
-            val (used, total) = repository.getStorageInfo()
-            _usedStorageG.value = used
-            _totalStorageG.value = total
+            val usedBytes = repository.getUsedStorageBytes()
+            _usedStorageG.value = String.format(Locale.US, "%.1f", usedBytes / (1024f * 1024f * 1024f)).toFloat()
 
             launch {
                 repository.observeRecentOpenedWithFolderInfo().collect { items ->

@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bytedance.cloudstorage.data.local.database.AppDatabase
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 import kotlinx.coroutines.Dispatchers
@@ -130,6 +131,7 @@ fun TxtReaderScreen(
     // fileKey = fileId + fileUri，用于在文件切换时重置所有状态
     TxtPagerContent(
         fileKey = "$fileId-$fileUri",
+        fileId = fileId,    // ← 新增
         fileName = fileName,
         fileUri = fileUri,
         onBack = onBack
@@ -209,6 +211,7 @@ private fun TxtPagerContent(
     fileName: String,
     fileUri: String,
     onBack: () -> Unit,
+    fileId: String,
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -258,6 +261,10 @@ private fun TxtPagerContent(
             // 在 Dispatchers.Default（后台线程）执行流式分页
             // 每算完一页通过 onPage 回调切回主线程 add 到 pages
             LaunchedEffect(fileKey, fileName, fileUri, contentWidthPx, maxLines, bodyStyle) {
+                val db = AppDatabase.getInstance(context)
+                withContext(Dispatchers.IO) {
+                    db.fileDao().updateLastOpenedAt(fileId, System.currentTimeMillis())
+                }
                 pages.clear()
                 isPaginating = true
                 errorMessage = null

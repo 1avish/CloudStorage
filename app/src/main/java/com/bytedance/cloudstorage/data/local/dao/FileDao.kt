@@ -165,6 +165,22 @@ interface FileDao {
     @Query("UPDATE files SET name = :newName, updatedAt = :now WHERE fileId = :fileId")
     suspend fun renameFile(fileId: String, newName: String, now: Long)
 
+    /** 更新文件最后浏览时间 */
+    @Query("UPDATE files SET lastOpenedAt = :now WHERE fileId = :fileId")
+    suspend fun updateLastOpenedAt(fileId: String, now: Long)
+    /** 计算所有未删除文件的总大小（字节），文件夹不计入 */
+    @Query("SELECT COALESCE(SUM(size), 0) FROM files WHERE isDeleted = 0 AND type != 'folder'")
+    suspend fun getTotalUsedSize(): Long
+
+    /**
+     * 批量移动文件（修改 parentId）
+     *
+     * @param ids 待移动的文件 ID 列表
+     * @param newParentId 目标父文件夹 ID，null 表示移动到根目录
+     * @param now 更新时间戳
+     */
+    @Query("UPDATE files SET parentId = :newParentId, updatedAt = :now WHERE fileId IN (:ids)")
+    suspend fun moveFiles(ids: List<String>, newParentId: String?, now: Long)
     /**
      * 在事务中执行任意数据库操作。
      *
