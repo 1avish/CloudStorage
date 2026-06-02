@@ -198,6 +198,14 @@ class FileRepository(
         return sources.size
     }
 
+   /** 记录文件被浏览（更新 lastOpenedAt） */
+    suspend fun markFileOpened(fileId: String){
+        fileDao.updateLastOpenedAt(fileId, System.currentTimeMillis())
+    }
+
+    /** 获取真实已用存储（字节） */
+    suspend fun getUsedStorageBytes(): Long = fileDao.getTotalUsedSize()
+
     /**
      * 递归复制单个文件/文件夹到目标父目录，返回新创建的文件 ID。
      *

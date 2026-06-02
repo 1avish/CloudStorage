@@ -83,6 +83,7 @@ fun VideoPlayerScreen(
 
     LaunchedEffect(fileId, fileName, fileUri) {
         viewModel.initVideo(fileId, fileName, fileUri)
+        viewModel.markFileOpened(fileId)
     }
 
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
