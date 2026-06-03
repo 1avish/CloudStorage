@@ -181,6 +181,9 @@ class FileRepository(
         val sources = getFilesByIds(fileIds)
         if (sources.isEmpty()) return 0
 
+        val savedCount = remoteDataSource.saveFilesToRoot(fileIds)
+        if (savedCount == 0) return 0
+
         val now = System.currentTimeMillis()
         val rootNames = getFilesByParent(null).map { it.name }.toMutableSet()
         fileDao.runInTransaction {
@@ -288,7 +291,7 @@ class FileRepository(
      * @return 新建文件夹的 ID
      */
     suspend fun createFolder(name: String, parentId: String?): String {
-        val id = java.util.UUID.randomUUID().toString()
+        val id = remoteDataSource.createFolder(name, parentId)
         val now = System.currentTimeMillis()
         val entity = FileEntity(
             fileId = id,
@@ -323,6 +326,7 @@ class FileRepository(
         parentId: String?,
     ) {
         val id = java.util.UUID.randomUUID().toString()
+        remoteDataSource.uploadFile(id, name, size, uri, coverUri, type, parentId)
         val now = System.currentTimeMillis()
         val entity = FileEntity(
             fileId = id,
@@ -340,11 +344,13 @@ class FileRepository(
 
     /** 批量逻辑删除文件 */
     suspend fun deleteFiles(ids: List<String>) {
+        remoteDataSource.deleteFiles(ids)
         fileDao.deleteFiles(ids)
     }
 
     /** 重命名文件 */
     suspend fun renameFile(fileId: String, newName: String) {
+        remoteDataSource.renameFile(fileId, newName)
         fileDao.renameFile(fileId, newName, System.currentTimeMillis())
     }
 
@@ -355,6 +361,7 @@ class FileRepository(
      * @param targetParentId 目标父文件夹 ID，null 表示移动到根目录
      */
     suspend fun moveFiles(ids: List<String>, targetParentId: String?) {
+        remoteDataSource.moveFiles(ids, targetParentId)
         fileDao.moveFiles(ids, targetParentId, System.currentTimeMillis())
     }
 }

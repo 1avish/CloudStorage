@@ -13,6 +13,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.bytedance.cloudstorage.data.local.database.AppDatabase
+import com.bytedance.cloudstorage.data.remote.datasource.MockFileRemoteDataSource
+import com.bytedance.cloudstorage.data.repository.FileRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -69,7 +71,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var initialized = false
     private var fileId: String = ""
     private var episodeJob: Job? = null
-    private val fileDao = AppDatabase.getInstance(application).fileDao()
+    private val db = AppDatabase.getInstance(application)
+    private val repository = FileRepository(
+        fileDao = db.fileDao(),
+        remoteDataSource = MockFileRemoteDataSource(application),
+    )
 
     fun initVideo(id: String, fileName: String, fileUri: String) {
         if (initialized) return
@@ -90,9 +96,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         episodeJob?.cancel()
         episodeJob = viewModelScope.launch {
             val currentFile = withContext(Dispatchers.IO) {
-                fileDao.getFileById(id)
+                db.fileDao().getFileById(id)
             } ?: return@launch
-            fileDao.getVideoFilesByParent(currentFile.parentId).collect { files ->
+            db.fileDao().getVideoFilesByParent(currentFile.parentId).collect { files ->
                 val episodes = files.map { file ->
                     Episode(
                         id = file.fileId,
@@ -229,7 +235,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    fileDao.deleteFiles(listOf(fileId))
+                    repository.deleteFiles(listOf(fileId))
                 }
                 // 删除本地文件
                 val episode = _activeEpisode.value
@@ -259,7 +265,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    fileDao.renameFile(fileId, newName, System.currentTimeMillis())
+                    repository.renameFile(fileId, newName)
                 }
                 _activeEpisode.value = _activeEpisode.value.copy(title = newName)
                 _toastMessage.tryEmit("已重命名")
@@ -275,9 +281,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         exoPlayer = null
     }
 
-    fun markFileOpened(id:String){
-        viewModelScope.launch { withContext(Dispatchers.IO){
-            fileDao.updateLastOpenedAt(id,System.currentTimeMillis())
+    fun markFileOpened(id: String) {
+        viewModelScope.launch { withContext(Dispatchers.IO) {
+            repository.markFileOpened(id)
         } }
     }
 }

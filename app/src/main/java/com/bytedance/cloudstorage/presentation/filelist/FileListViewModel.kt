@@ -40,7 +40,7 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     private val db = AppDatabase.getInstance(application)
     private val repository = FileRepository(
         fileDao = db.fileDao(),
-        remoteDataSource = MockFileRemoteDataSource(),
+        remoteDataSource = MockFileRemoteDataSource(application),
     )
     private val shareLinkStore = ShareLinkStore(application)
 
