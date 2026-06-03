@@ -52,7 +52,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val db = AppDatabase.getInstance(application)
         repository = FileRepository(
             fileDao = db.fileDao(),
-            remoteDataSource = MockFileRemoteDataSource(),
+            remoteDataSource = MockFileRemoteDataSource(application),
         )
         loadData()
     }
