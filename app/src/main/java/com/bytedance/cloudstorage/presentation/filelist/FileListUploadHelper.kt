@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import com.bytedance.cloudstorage.domain.model.CloudFile
 import java.io.File
 import java.util.UUID
@@ -123,8 +124,13 @@ internal fun uploadSelectedFile(
     val cleanName = sanitizeFileName(fileName)
     val uniqueName = generateUniqueName(cleanName, existingFiles.map { it.name }.toSet())
 
-    // 拷贝到应用本地目录
-    val localUri = copyToAppStorage(context, uri, uniqueName)
+    // 拷贝到应用本地目录（失败时提示用户）
+    val localUri = try {
+        copyToAppStorage(context, uri, uniqueName)
+    } catch (_: Exception) {
+        Toast.makeText(context, "文件保存失败，可能磁盘空间不足", Toast.LENGTH_SHORT).show()
+        return
+    }
     val coverUri = if (fileType == "video") {
         createVideoCover(context, localUri)?.toString()
     } else {
@@ -142,7 +148,8 @@ internal fun uploadSelectedFile(
 
 /**
  * 将 content:// 文件拷贝到 app 私有目录 files/uploads/
- * @return 本地文件的 file:// URI，失败则返回原始 content:// URI
+ * @return 本地文件的 file:// URI
+ * @throws IllegalStateException 拷贝失败时抛出（磁盘满、权限不足等）
  */
 private fun copyToAppStorage(context: Context, sourceUri: Uri, fileName: String): Uri {
     val uploadDir = File(context.filesDir, "uploads")
@@ -150,16 +157,13 @@ private fun copyToAppStorage(context: Context, sourceUri: Uri, fileName: String)
 
     val localFile = File(uploadDir, fileName)
 
-    return try {
-        context.contentResolver.openInputStream(sourceUri)?.use { input ->
-            localFile.outputStream().use { output ->
-                input.copyTo(output)
-            }
+    context.contentResolver.openInputStream(sourceUri)?.use { input ->
+        localFile.outputStream().use { output ->
+            input.copyTo(output)
         }
-        Uri.fromFile(localFile)
-    } catch (_: Exception) {
-        sourceUri
-    }
+    } ?: throw IllegalStateException("无法读取源文件")
+
+    return Uri.fromFile(localFile)
 }
 
 internal fun createVideoCover(context: Context, videoUri: Uri): Uri? {
