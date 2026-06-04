@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -69,6 +72,7 @@ internal fun PlayerCard(
     playbackSpeed: Float,
     durationMs: Long,
     currentPosition: Long,
+    playbackError: Boolean,
     showSpeedMenu: Boolean,
     onShowSpeedMenu: () -> Unit,
     onDismissSpeedMenu: () -> Unit,
@@ -78,6 +82,7 @@ internal fun PlayerCard(
     onBack: () -> Unit,
     onMoreClick: () -> Unit,
     onFullscreen: () -> Unit,
+    onRetry: () -> Unit,
     viewModel: VideoPlayerViewModel
 ) {
     Column(
@@ -155,6 +160,32 @@ internal fun PlayerCard(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+            } else if (playbackError) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.linearGradient(listOf(Color(0xFF0B1E35), Color(0xFF12273D), Color(0xFF081520)))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("视频加载失败", fontSize = 14.ws.sp, color = Color.White.copy(alpha = 0.65f))
+                        Spacer(modifier = Modifier.height(12.w.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.w.dp))
+                                .background(Color.White.copy(alpha = 0.15f))
+                                .clickable { onRetry() }
+                                .padding(horizontal = 20.w.dp, vertical = 8.w.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Refresh, "重试", tint = Color.White, modifier = Modifier.size(16.w.dp))
+                                Spacer(modifier = Modifier.width(4.w.dp))
+                                Text("重试", fontSize = 13.ws.sp, color = Color.White)
+                            }
+                        }
+                    }
+                }
             }
 
             // 顶部渐变遮罩 + 按钮
