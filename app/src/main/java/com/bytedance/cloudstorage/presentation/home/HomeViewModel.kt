@@ -48,6 +48,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     init {
         val db = AppDatabase.getInstance(application)
         repository = FileRepository(
@@ -63,25 +66,31 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
      * 2. 读取存储空间信息
      * 3. 收集 Repository 返回的 Flow，直接转发给 UI
      */
-    private fun loadData() {
+    fun loadData() {
         viewModelScope.launch {
-            repository.initializeDataIfEmpty()
+            _errorMessage.value = null
+            _isLoading.value = true
+            try {
+                repository.initializeDataIfEmpty()
 
-            val usedBytes = repository.getUsedStorageBytes()
-            _usedStorageG.value = String.format(Locale.US, "%.1f", usedBytes / (1024f * 1024f * 1024f)).toFloat()
+                val usedBytes = repository.getUsedStorageBytes()
+                _usedStorageG.value = String.format(Locale.US, "%.1f", usedBytes / (1024f * 1024f * 1024f)).toFloat()
 
-            launch {
-                repository.observeRecentOpenedWithFolderInfo().collect { items ->
-                    _recentViews.value = items
+                launch {
+                    repository.observeRecentOpenedWithFolderInfo().collect { items ->
+                        _recentViews.value = items
+                    }
                 }
-            }
-            launch {
-                repository.observeRecentSavedWithFolderInfo().collect { items ->
-                    _recentSaves.value = items
+                launch {
+                    repository.observeRecentSavedWithFolderInfo().collect { items ->
+                        _recentSaves.value = items
+                    }
                 }
+            } catch (_: Exception) {
+                _errorMessage.value = "加载数据失败，请检查网络"
+            } finally {
+                _isLoading.value = false
             }
-
-            _isLoading.value = false
         }
     }
 }

@@ -22,11 +22,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -93,52 +95,114 @@ fun HomeScreen(
     val recentViews   by viewModel.recentViews.collectAsStateWithLifecycle()
     val recentSaves   by viewModel.recentSaves.collectAsStateWithLifecycle()
     val isLoading     by viewModel.isLoading.collectAsStateWithLifecycle()
+    val errorMessage  by viewModel.errorMessage.collectAsStateWithLifecycle()
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgGray)
-            .padding(horizontal = 16.w.dp),
-        verticalArrangement = Arrangement.spacedBy(16.w.dp),
-        // 上下留白
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            top = 16.w.dp,
-            bottom = 32.w.dp
-        )
-    ) {
-        // 个人信息卡片
-        item {
-            PersonalSpaceCard(
-                usedStorageG = usedStorageG,
-                totalStorageG = totalStorageG,
+    when {
+        isLoading -> {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BgGray),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = ProgressBlue)
+            }
+        }
+        errorMessage != null -> {
+            ErrorRetryContent(
+                message = errorMessage!!,
+                onRetry = { viewModel.loadData() }
             )
         }
-        // 最近转存
-        item {
-            RecentFileCard(
-                title = "最近转存",
-                emptyHint = "暂无转存记录",
-                items = recentSaves,
-                onOpenVideo = onOpenVideo,
-                onOpenTxt = onOpenTxt,
-            )
-        }
-        // 最近浏览
-        item {
-            RecentFileCard(
-                title = "最近浏览",
-                emptyHint = "暂无浏览记录",
-                items = recentViews,
-                onOpenVideo = onOpenVideo,
-                onOpenTxt = onOpenTxt,
-            )
+        else -> {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BgGray)
+                    .padding(horizontal = 16.w.dp),
+                verticalArrangement = Arrangement.spacedBy(16.w.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    top = 16.w.dp,
+                    bottom = 32.w.dp
+                )
+            ) {
+                item {
+                    PersonalSpaceCard(
+                        usedStorageG = usedStorageG,
+                        totalStorageG = totalStorageG,
+                    )
+                }
+                item {
+                    RecentFileCard(
+                        title = "最近转存",
+                        emptyHint = "暂无转存记录",
+                        items = recentSaves,
+                        onOpenVideo = onOpenVideo,
+                        onOpenTxt = onOpenTxt,
+                    )
+                }
+                item {
+                    RecentFileCard(
+                        title = "最近浏览",
+                        emptyHint = "暂无浏览记录",
+                        items = recentViews,
+                        onOpenVideo = onOpenVideo,
+                        onOpenTxt = onOpenTxt,
+                    )
+                }
+            }
         }
     }
 }
 
 // ────────────────────────────────────────────────
-// 个人信息卡片
+// 加载失败重试组件
 // ────────────────────────────────────────────────
+
+@Composable
+private fun ErrorRetryContent(
+    message: String,
+    onRetry: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgGray),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = TextGray.copy(alpha = 0.6f),
+                modifier = Modifier.size(48.w.dp)
+            )
+            Spacer(modifier = Modifier.height(12.w.dp))
+            Text(
+                text = message,
+                fontSize = 15.ws.sp,
+                fontWeight = FontWeight.Medium,
+                color = TextGray,
+            )
+            Spacer(modifier = Modifier.height(16.w.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.w.dp))
+                    .background(ProgressBlue)
+                    .clickable { onRetry() }
+                    .padding(horizontal = 24.w.dp, vertical = 10.w.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "重试",
+                    fontSize = 15.ws.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White,
+                )
+            }
+        }
+    }
+}
 
 /**
  * 个人信息卡片，展示头像、存储使用量和进度条。
