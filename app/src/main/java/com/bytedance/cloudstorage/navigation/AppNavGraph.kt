@@ -26,6 +26,7 @@ import com.bytedance.cloudstorage.data.share.ShareLinkStore
 import com.bytedance.cloudstorage.presentation.MainScreen
 import com.bytedance.cloudstorage.presentation.share.ShareLinkPromptDialog
 import com.bytedance.cloudstorage.presentation.share.ShareListScreen
+import com.bytedance.cloudstorage.presentation.transfer.TransferScreen
 import com.bytedance.cloudstorage.presentation.txtreader.TxtReaderScreen
 import com.bytedance.cloudstorage.presentation.videoplayer.VideoPlayerScreen
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ import java.net.URLEncoder
 
 object Screen {
     const val Main = "main"
+    const val Transfer = "transfer"
     const val VideoPlayer = "videoplayer/{fileId}/{fileName}/{fileUri}"
     const val TxtReader = "txtreader/{fileId}/{fileName}/{fileUri}"
     /** 分享文件列表页，token 从 deeplink 或剪贴板解析得到 */
@@ -113,7 +115,21 @@ fun AppNavGraph(
                 },
                 onOpenShareLink = { token ->
                     navController.navigate(Screen.shareList(token))
+                },
+                onOpenTransfer = {
+                    navController.navigate(Screen.Transfer)
                 }
+            )
+        }
+        composable(
+            route = Screen.Transfer,
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) {
+            TransferScreen(
+                onBack = { navController.popBackStack() }
             )
         }
         composable(
