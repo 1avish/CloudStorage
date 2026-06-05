@@ -94,6 +94,7 @@ fun VideoPlayerScreen(
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val isDeleted by viewModel.isDeleted.collectAsStateWithLifecycle()
     val isPlayerReady by viewModel.isPlayerReady.collectAsStateWithLifecycle()
+    val playbackError by viewModel.playbackError.collectAsStateWithLifecycle()
 
     LaunchedEffect(isDeleted) {
         if (isDeleted) onBack()
@@ -262,6 +263,7 @@ fun VideoPlayerScreen(
                 playbackSpeed = playbackSpeed,
                 durationMs = durationMs,
                 currentPosition = currentPosition,
+                playbackError = playbackError,
                 showSpeedMenu = showSpeedMenu,
                 onShowSpeedMenu = { showSpeedMenu = true },
                 onDismissSpeedMenu = { showSpeedMenu = false },
@@ -274,6 +276,7 @@ fun VideoPlayerScreen(
                 onBack = onBack,
                 onMoreClick = { showMoreSheet = true },
                 onFullscreen = { isFullscreen = true },
+                onRetry = { viewModel.retryPlay() },
                 viewModel = viewModel
             )
 

@@ -55,6 +55,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.StringReader
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.max
@@ -288,11 +290,15 @@ private fun TxtPagerContent(
                 }
 
                 runCatching {
+                    val charset = withContext(Dispatchers.IO) {
+                        detectCharset(context.applicationContext, fileUri)
+                    }
                     withContext(Dispatchers.Default) {
                         paginateTxtStream(
                             context = context.applicationContext,
                             fileName = fileName,
                             fileUri = fileUri,
+                            charset = charset,
                             textMeasurer = textMeasurer,
                             style = bodyStyle,
                             maxWidthPx = contentWidthPx,
@@ -432,13 +438,14 @@ private suspend fun paginateTxtStream(
     context: Context,
     fileName: String,
     fileUri: String,
+    charset: Charset,
     textMeasurer: TextMeasurer,
     style: TextStyle,
     maxWidthPx: Int,
     maxLinesPerPage: Int,
     onPage: suspend (String) -> Unit,
 ) {
-    openTxtReader(context, fileName, fileUri).use { reader ->
+    openTxtReader(context, fileName, fileUri, charset).use { reader ->
         val pageAccumulator = PageAccumulator(
             maxLinesPerPage = maxLinesPerPage,
             onPage = onPage
@@ -610,6 +617,85 @@ private suspend fun streamNormalizedSegments(
     }
 }
 
+// ── 编码检测 ──
+// 读取文件前 8KB，按 BOM 标记 → UTF-8 合法性检查 → 回退 GB18030 的顺序判断
+
+private const val CHARSET_SNIFF_SIZE = 8 * 1024
+
+/**
+ * 嗅探文本文件编码。
+ *
+ * 优先级：
+ * 1. BOM 标记（UTF-8 / UTF-16LE / UTF-16BE）
+ * 2. 样本是否为合法 UTF-8 多字节序列
+ * 3. 回退 GB18030（兼容 GBK、GB2312）
+ */
+private fun detectCharset(context: Context, fileUri: String): Charset {
+    if (fileUri.isBlank()) return StandardCharsets.UTF_8
+
+    val uri = Uri.parse(fileUri)
+    val sample = context.contentResolver.openInputStream(uri)?.use { stream ->
+        val buf = ByteArray(CHARSET_SNIFF_SIZE)
+        val read = stream.read(buf)
+        if (read <= 0) return StandardCharsets.UTF_8
+        buf.copyOf(read)
+    } ?: return StandardCharsets.UTF_8
+
+    // BOM 检测
+    if (sample.size >= 3 &&
+        sample[0] == 0xEF.toByte() &&
+        sample[1] == 0xBB.toByte() &&
+        sample[2] == 0xBF.toByte()
+    ) return StandardCharsets.UTF_8
+
+    if (sample.size >= 2) {
+        if (sample[0] == 0xFF.toByte() && sample[1] == 0xFE.toByte())
+            return StandardCharsets.UTF_16LE
+        if (sample[0] == 0xFE.toByte() && sample[1] == 0xFF.toByte())
+            return StandardCharsets.UTF_16BE
+    }
+
+    // 启发式：样本中是否存在合法的 UTF-8 多字节序列
+    if (isValidUtf8Sample(sample)) return StandardCharsets.UTF_8
+
+    // 回退：GB18030 完整覆盖 GBK / GB2312
+    return Charset.forName("GB18030")
+}
+
+/**
+ * 简易 UTF-8 合法性检查。
+ *
+ * 遍历样本字节，统计合法的多字节序列数量。
+ * 若存在至少一个合法的 2/3/4 字节序列，且无非法起始字节，判定为 UTF-8。
+ */
+private fun isValidUtf8Sample(sample: ByteArray): Boolean {
+    var multiByteSequences = 0
+    var i = 0
+    while (i < sample.size) {
+        val b = sample[i].toInt() and 0xFF
+        when {
+            b <= 0x7F -> i++ // ASCII
+            b in 0xC2..0xDF && i + 1 < sample.size &&
+                (sample[i + 1].toInt() and 0xC0) == 0x80 -> {
+                multiByteSequences++; i += 2
+            }
+            b in 0xE0..0xEF && i + 2 < sample.size &&
+                (sample[i + 1].toInt() and 0xC0) == 0x80 &&
+                (sample[i + 2].toInt() and 0xC0) == 0x80 -> {
+                multiByteSequences++; i += 3
+            }
+            b in 0xF0..0xF4 && i + 3 < sample.size &&
+                (sample[i + 1].toInt() and 0xC0) == 0x80 &&
+                (sample[i + 2].toInt() and 0xC0) == 0x80 &&
+                (sample[i + 3].toInt() and 0xC0) == 0x80 -> {
+                multiByteSequences++; i += 4
+            }
+            else -> return false // 非法 UTF-8 字节
+        }
+    }
+    return multiByteSequences > 0 || sample.all { (it.toInt() and 0xFF) <= 0x7F }
+}
+
 // ── 打开文本文件的 BufferedReader ──
 // fileUri 为空时返回模拟数据的 reader
 
@@ -617,6 +703,7 @@ private fun openTxtReader(
     context: Context,
     fileName: String,
     fileUri: String,
+    charset: Charset = StandardCharsets.UTF_8,
 ): BufferedReader {
     if (fileUri.isBlank()) {
         return BufferedReader(StringReader(buildMockTxtContent(fileName)))
@@ -625,7 +712,7 @@ private fun openTxtReader(
     val uri = Uri.parse(fileUri)
     val input = context.contentResolver.openInputStream(uri)
         ?: error("无法打开文本文件")
-    return input.bufferedReader(Charsets.UTF_8)
+    return input.bufferedReader(charset)
 }
 
 // ── 模拟数据（无真实文件时使用）──

@@ -128,6 +128,12 @@ fun FileListScreen(
         }
     }
 
+    LaunchedEffect(viewModel) {
+        viewModel.toastMessage.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // ── 系统返回键：选择模式下退出选择，否则返回上一级 ──
     BackHandler(enabled = isSelectionMode) {
         viewModel.exitSelectionMode()
@@ -492,7 +498,6 @@ fun FileListScreen(
                 onConfirm = {
                     viewModel.deleteSelectedFiles()
                     showDeleteConfirm = false
-                    Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
                 }
             )
         }

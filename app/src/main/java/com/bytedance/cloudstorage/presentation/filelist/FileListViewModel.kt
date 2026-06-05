@@ -50,6 +50,9 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     private val _shareTokenLookupResult = MutableSharedFlow<String?>(extraBufferCapacity = 1)
     val shareTokenLookupResult: SharedFlow<String?> = _shareTokenLookupResult
 
+    private val _toastMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val toastMessage: SharedFlow<String> = _toastMessage
+
     // ── 当前文件夹层级（null = 根目录） ──
     private val _currentFolderId = MutableStateFlow<String?>(null)
 
@@ -168,7 +171,11 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     /** 创建新文件夹（在当前目录下） */
     fun createFolder(name: String) {
         viewModelScope.launch {
-            repository.createFolder(name, _currentFolderId.value)
+            try {
+                repository.createFolder(name, _currentFolderId.value)
+            } catch (_: Exception) {
+                _toastMessage.tryEmit("创建文件夹失败")
+            }
         }
     }
 
@@ -182,14 +189,18 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
      */
     fun uploadFile(name: String, size: Long, uri: String, coverUri: String?, type: String) {
         viewModelScope.launch {
-            repository.uploadFile(
-                name = name,
-                size = size,
-                uri = uri,
-                coverUri = coverUri,
-                type = type,
-                parentId = _currentFolderId.value,
-            )
+            try {
+                repository.uploadFile(
+                    name = name,
+                    size = size,
+                    uri = uri,
+                    coverUri = coverUri,
+                    type = type,
+                    parentId = _currentFolderId.value,
+                )
+            } catch (_: Exception) {
+                _toastMessage.tryEmit("上传失败")
+            }
         }
     }
 
@@ -264,15 +275,24 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     /** 批量删除选中文件 */
     fun deleteSelectedFiles() {
         viewModelScope.launch {
-            repository.deleteFiles(_selectedFileIds.value.toList())
-            exitSelectionMode()
+            try {
+                repository.deleteFiles(_selectedFileIds.value.toList())
+                exitSelectionMode()
+                _toastMessage.tryEmit("已删除")
+            } catch (_: Exception) {
+                _toastMessage.tryEmit("删除失败")
+            }
         }
     }
 
     /** 重命名文件 */
     fun renameFile(fileId: String, newName: String) {
         viewModelScope.launch {
-            repository.renameFile(fileId, newName)
+            try {
+                repository.renameFile(fileId, newName)
+            } catch (_: Exception) {
+                _toastMessage.tryEmit("重命名失败")
+            }
         }
     }
 
@@ -389,9 +409,13 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         val targetId = _moveTargetFolderId.value
         if (ids.isEmpty()) return
         viewModelScope.launch {
-            repository.moveFiles(ids, targetId)
-            exitSelectionMode()
-            _showMoveSheet.value = false
+            try {
+                repository.moveFiles(ids, targetId)
+                exitSelectionMode()
+                _showMoveSheet.value = false
+            } catch (_: Exception) {
+                _toastMessage.tryEmit("移动失败")
+            }
         }
     }
 

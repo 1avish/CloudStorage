@@ -57,8 +57,13 @@ object Screen {
     fun shareList(token: String): String = "share/${encodeRouteArg(token)}"
 
     fun decodeRouteArg(value: String): String {
-        val decoded = URLDecoder.decode(value, "UTF-8")
-        return if (decoded == EmptyArg) "" else decoded
+        if (value.isBlank()) return ""
+        return try {
+            val decoded = URLDecoder.decode(value, "UTF-8")
+            if (decoded == EmptyArg) "" else decoded
+        } catch (_: Exception) {
+            value // 解码失败时返回原始值，避免导航崩溃
+        }
     }
 
     private fun encodeRouteArg(value: String): String {

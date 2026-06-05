@@ -98,15 +98,20 @@ class ShareLinkStore(context: Context) {
 
     /**
      * 从系统剪贴板读取并解析分享链接，未匹配到有效链接时返回 null。
+     * 部分 ROM 对 coerceToText 会抛异常，此处统一捕获。
      */
     fun readTokenFromClipboard(): String? {
-        val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        if (!clipboard.hasPrimaryClip()) return null
-        val clip = clipboard.primaryClip ?: return null
-        if (clip.itemCount == 0) return null
-        val item = clip.getItemAt(0)
-        val text = item.coerceToText(appContext)?.toString()?.trim().orEmpty()
-        return parseToken(text)
+        return try {
+            val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            if (!clipboard.hasPrimaryClip()) return null
+            val clip = clipboard.primaryClip ?: return null
+            if (clip.itemCount == 0) return null
+            val item = clip.getItemAt(0)
+            val text = item.coerceToText(appContext)?.toString()?.trim().orEmpty()
+            parseToken(text)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     companion object {

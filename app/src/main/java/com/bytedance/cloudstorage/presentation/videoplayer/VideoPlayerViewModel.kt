@@ -56,6 +56,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private val _isPlayerReady = MutableStateFlow(false)
     val isPlayerReady: StateFlow<Boolean> = _isPlayerReady.asStateFlow()
 
+    private val _playbackError = MutableStateFlow(false)
+    val playbackError: StateFlow<Boolean> = _playbackError.asStateFlow()
+
     private val _activeEpisode = MutableStateFlow(Episode("", "", ""))
     val activeEpisode: StateFlow<Episode> = _activeEpisode.asStateFlow()
 
@@ -144,6 +147,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             override fun onPlayerError(error: PlaybackException) {
                 player.release()
                 exoPlayer = null
+                _isPlayerReady.value = false
+                _playbackError.value = true
+                _toastMessage.tryEmit("视频播放失败")
             }
         })
         return player
@@ -157,6 +163,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun selectEpisode(episode: Episode) {
         fileId = episode.id
         _activeEpisode.value = episode
+        _playbackError.value = false
+        _isPlayerReady.value = false
         if (episode.uri.isNotEmpty()) {
             val player = exoPlayer ?: initPlayer(episode.uri)
             player.setMediaItem(MediaItem.fromUri(Uri.parse(episode.uri)))
@@ -170,6 +178,15 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         val safeSpeed = speed.coerceIn(0.25f, 3f)
         _playbackSpeed.value = safeSpeed
         exoPlayer?.setPlaybackSpeed(safeSpeed)
+    }
+
+    /** 播放出错后重试：清除错误状态，重新初始化播放器 */
+    fun retryPlay() {
+        val uri = _activeEpisode.value.uri
+        if (uri.isNotEmpty()) {
+            _playbackError.value = false
+            initPlayer(uri)
+        }
     }
 
     fun seekTo(fraction: Float) {
@@ -199,7 +216,10 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 withContext(Dispatchers.IO) {
                     val sourceFile = File(Uri.parse(episode.uri).path ?: return@withContext)
-                    if (!sourceFile.exists()) return@withContext
+                    if (!sourceFile.exists()) {
+                        _toastMessage.tryEmit("源文件不存在")
+                        return@withContext
+                    }
 
                     val context = getApplication<Application>()
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

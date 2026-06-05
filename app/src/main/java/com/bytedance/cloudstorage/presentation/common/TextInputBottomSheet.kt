@@ -39,6 +39,7 @@ import com.bytedance.cloudstorage.presentation.filelist.DividerColor
 import com.bytedance.cloudstorage.presentation.filelist.PrimaryBlue
 import com.bytedance.cloudstorage.presentation.filelist.TextPrimary
 import com.bytedance.cloudstorage.presentation.filelist.TextSecondary
+import com.bytedance.cloudstorage.presentation.filelist.sanitizeFileName
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 
@@ -58,14 +59,16 @@ import com.bytedance.cloudstorage.utils.ws
  * @param title       弹窗标题，如「新建文件夹」「重命名」
  * @param placeholder 输入框占位文字
  * @param initialValue 初始值，重命名场景传入原名
+ * @param maxLength   最大输入字符数，默认 50
  * @param onDismiss   取消/关闭回调
- * @param onConfirm   确认回调，返回去除首尾空格后的文本
+ * @param onConfirm   确认回调，返回经 sanitizeFileName 清理后的文本
  */
 @Composable
 internal fun TextInputBottomSheet(
     title: String,
     placeholder: String,
     initialValue: String = "",
+    maxLength: Int = 50,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
@@ -134,7 +137,11 @@ internal fun TextInputBottomSheet(
             }
             BasicTextField(
                 value = inputValue,
-                onValueChange = { inputValue = it },
+                onValueChange = { raw ->
+                    // 实时过滤非法字符并限制长度
+                    val filtered = raw.replace(Regex("[\\\\/:*?\"<>|\\x00-\\x1f]"), "")
+                    inputValue = if (filtered.length > maxLength) filtered.substring(0, maxLength) else filtered
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
@@ -145,8 +152,7 @@ internal fun TextInputBottomSheet(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = {
-                    // 键盘 Done 键：内容非空时触发确认
-                    if (inputValue.isNotBlank()) onConfirm(inputValue.trim())
+                    if (inputValue.isNotBlank()) onConfirm(sanitizeFileName(inputValue))
                 })
             )
         }
@@ -184,7 +190,7 @@ internal fun TextInputBottomSheet(
                     .clip(RoundedCornerShape(8.w.dp))
                     .background(PrimaryBlue)
                     .clickable(enabled = inputValue.isNotBlank()) {
-                        onConfirm(inputValue.trim())
+                        onConfirm(sanitizeFileName(inputValue))
                     },
                 contentAlignment = Alignment.Center
             ) {

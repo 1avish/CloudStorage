@@ -101,22 +101,26 @@ class ShareListViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = ShareListUiState(isLoading = true)
 
         viewModelScope.launch {
-            // 首次进入时确保本地有 Mock 数据
-            repository.initializeDataIfEmpty()
-            val fileIds = shareLinkStore.getFileIds(token)
-            if (fileIds.isNullOrEmpty()) {
-                _uiState.value = ShareListUiState(isLoading = false, invalid = true)
-                return@launch
-            }
+            try {
+                // 首次进入时确保本地有 Mock 数据
+                repository.initializeDataIfEmpty()
+                val fileIds = shareLinkStore.getFileIds(token)
+                if (fileIds.isNullOrEmpty()) {
+                    _uiState.value = ShareListUiState(isLoading = false, invalid = true)
+                    return@launch
+                }
 
-            rootFiles = repository.getFilesByIds(fileIds)
-            // 默认全选所有文件
-            _uiState.value = ShareListUiState(
-                isLoading = false,
-                files = rootFiles,
-                selectedIds = rootFiles.map { it.id }.toSet(),
-                invalid = rootFiles.isEmpty(),
-            )
+                rootFiles = repository.getFilesByIds(fileIds)
+                // 默认全选所有文件
+                _uiState.value = ShareListUiState(
+                    isLoading = false,
+                    files = rootFiles,
+                    selectedIds = rootFiles.map { it.id }.toSet(),
+                    invalid = rootFiles.isEmpty(),
+                )
+            } catch (_: Exception) {
+                _uiState.value = ShareListUiState(isLoading = false, invalid = true)
+            }
         }
     }
 
@@ -125,16 +129,22 @@ class ShareListViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun navigateIntoFolder(folderId: String) {
         viewModelScope.launch {
-            folderStack = folderStack + folderId
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            val files = repository.getFilesByParent(folderId)
-            _uiState.value = ShareListUiState(
-                isLoading = false,
-                files = files,
-                selectedIds = files.map { it.id }.toSet(),
-                invalid = false,
-                canNavigateBack = folderStack.isNotEmpty(),
-            )
+            try {
+                folderStack = folderStack + folderId
+                _uiState.value = _uiState.value.copy(isLoading = true)
+                val files = repository.getFilesByParent(folderId)
+                _uiState.value = ShareListUiState(
+                    isLoading = false,
+                    files = files,
+                    selectedIds = files.map { it.id }.toSet(),
+                    invalid = false,
+                    canNavigateBack = folderStack.isNotEmpty(),
+                )
+            } catch (_: Exception) {
+                folderStack = folderStack.dropLast(1)
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                _saveResult.tryEmit(ShareSaveResult("加载失败", shouldExit = false))
+            }
         }
     }
 
@@ -147,18 +157,22 @@ class ShareListViewModel(application: Application) : AndroidViewModel(applicatio
         if (folderStack.isEmpty()) return false
         folderStack = folderStack.dropLast(1)
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            // 栈空时回退到根级文件列表
-            val files = folderStack.lastOrNull()?.let { folderId ->
-                repository.getFilesByParent(folderId)
-            } ?: rootFiles
-            _uiState.value = ShareListUiState(
-                isLoading = false,
-                files = files,
-                selectedIds = files.map { it.id }.toSet(),
-                invalid = false,
-                canNavigateBack = folderStack.isNotEmpty(),
-            )
+            try {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+                val files = folderStack.lastOrNull()?.let { folderId ->
+                    repository.getFilesByParent(folderId)
+                } ?: rootFiles
+                _uiState.value = ShareListUiState(
+                    isLoading = false,
+                    files = files,
+                    selectedIds = files.map { it.id }.toSet(),
+                    invalid = false,
+                    canNavigateBack = folderStack.isNotEmpty(),
+                )
+            } catch (_: Exception) {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+                _saveResult.tryEmit(ShareSaveResult("加载失败", shouldExit = false))
+            }
         }
         return true
     }
@@ -207,16 +221,21 @@ class ShareListViewModel(application: Application) : AndroidViewModel(applicatio
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true)
-            val savedCount = repository.saveFilesToRoot(selectedIds)
-            _uiState.value = _uiState.value.copy(isSaving = false)
-            _saveResult.emit(
-                if (savedCount > 0) {
-                    markHandled(ShareLinkHandledAction.Saved)
-                    ShareSaveResult("已保存${savedCount}个文件到网盘", shouldExit = true)
-                } else {
-                    ShareSaveResult("保存失败，文件已不存在", shouldExit = false)
-                }
-            )
+            try {
+                val savedCount = repository.saveFilesToRoot(selectedIds)
+                _uiState.value = _uiState.value.copy(isSaving = false)
+                _saveResult.emit(
+                    if (savedCount > 0) {
+                        markHandled(ShareLinkHandledAction.Saved)
+                        ShareSaveResult("已保存${savedCount}个文件到网盘", shouldExit = true)
+                    } else {
+                        ShareSaveResult("保存失败，文件已不存在", shouldExit = false)
+                    }
+                )
+            } catch (_: Exception) {
+                _uiState.value = _uiState.value.copy(isSaving = false)
+                _saveResult.emit(ShareSaveResult("保存失败，请重试", shouldExit = false))
+            }
         }
     }
 
