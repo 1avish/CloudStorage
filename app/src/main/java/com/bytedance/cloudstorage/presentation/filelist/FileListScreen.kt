@@ -347,7 +347,7 @@ fun FileListScreen(
                 FileActionBar(
                     selectedFiles = selectedFiles,
                     onDownload = {
-                        Toast.makeText(context, "下载功能（待实现）", Toast.LENGTH_SHORT).show()
+                        viewModel.downloadSelectedFiles()
                     },
                     onShare = {
                         // 创建分享链接 → 复制到剪贴板 → 弹出提示弹窗

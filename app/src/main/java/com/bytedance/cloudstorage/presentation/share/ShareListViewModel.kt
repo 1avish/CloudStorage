@@ -70,6 +70,7 @@ class ShareListViewModel(application: Application) : AndroidViewModel(applicatio
     private val repository = FileRepository(
         fileDao = db.fileDao(),
         remoteDataSource = MockFileRemoteDataSource(application),
+        transferRecordDao = db.transferRecordDao(),
     )
     private val shareLinkStore = ShareLinkStore(application)
 

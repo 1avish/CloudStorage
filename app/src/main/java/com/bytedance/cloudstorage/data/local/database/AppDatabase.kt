@@ -8,9 +8,11 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.bytedance.cloudstorage.data.local.dao.FileDao
 import com.bytedance.cloudstorage.data.local.dao.ShareLinkDao
+import com.bytedance.cloudstorage.data.local.dao.TransferRecordDao
 import com.bytedance.cloudstorage.data.local.entity.FileEntity
 import com.bytedance.cloudstorage.data.local.entity.ShareLinkEntity
 import com.bytedance.cloudstorage.data.local.entity.ShareLinkFileEntity
+import com.bytedance.cloudstorage.data.local.entity.TransferRecordEntity
 
 /**
  * Room 数据库类
@@ -26,8 +28,9 @@ import com.bytedance.cloudstorage.data.local.entity.ShareLinkFileEntity
         FileEntity::class,
         ShareLinkEntity::class,
         ShareLinkFileEntity::class,
+        TransferRecordEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +38,7 @@ abstract class AppDatabase : RoomDatabase() {
     /** 提供 FileDao 实例，Room 自动生成实现 */
     abstract fun fileDao(): FileDao
     abstract fun shareLinkDao(): ShareLinkDao
+    abstract fun transferRecordDao(): TransferRecordDao
 
     companion object {
         /**
@@ -77,6 +81,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS transfer_records (
+                        recordId TEXT NOT NULL PRIMARY KEY,
+                        fileId TEXT,
+                        name TEXT NOT NULL,
+                        size INTEGER NOT NULL,
+                        type TEXT NOT NULL,
+                        direction TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        savedPath TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -84,7 +107,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "miniclouddisk.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                     .also { INSTANCE = it }
             }

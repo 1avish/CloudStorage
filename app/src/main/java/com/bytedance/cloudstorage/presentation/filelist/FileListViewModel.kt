@@ -41,6 +41,7 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     private val repository = FileRepository(
         fileDao = db.fileDao(),
         remoteDataSource = MockFileRemoteDataSource(application),
+        transferRecordDao = db.transferRecordDao(),
     )
     private val shareLinkStore = ShareLinkStore(application)
 
@@ -286,6 +287,27 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     }
 
     /** 重命名文件 */
+    fun downloadSelectedFiles() {
+        val ids = files.value.map { it.id }.filter { it in _selectedFileIds.value }
+        if (ids.isEmpty()) {
+            viewModelScope.launch { _toastMessage.emit("请先选择文件") }
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val downloadedCount = repository.downloadFilesToDownloads(getApplication(), ids)
+                if (downloadedCount > 0) {
+                    exitSelectionMode()
+                    _toastMessage.emit("已下载${downloadedCount}个文件到 Download")
+                } else {
+                    _toastMessage.emit("下载失败，文件不存在或没有本地副本")
+                }
+            } catch (_: Exception) {
+                _toastMessage.emit("下载失败，请重试")
+            }
+        }
+    }
+
     fun renameFile(fileId: String, newName: String) {
         viewModelScope.launch {
             try {

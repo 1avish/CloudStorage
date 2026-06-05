@@ -24,6 +24,7 @@ fun MainScreen(
     onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
     onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> },
     onOpenShareLink: (String) -> Unit = {},
+    onOpenTransfer: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -48,9 +49,7 @@ fun MainScreen(
                     }
                 },
                 transferTaskCount = 0,
-                onTransferClick = {
-                    Toast.makeText(context, "传输页（待实现）", Toast.LENGTH_SHORT).show()
-                },
+                onTransferClick = onOpenTransfer,
                 onSearchClick = {
                     Toast.makeText(context, "搜索（待实现）", Toast.LENGTH_SHORT).show()
                 },
