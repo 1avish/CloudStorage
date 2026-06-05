@@ -20,7 +20,6 @@ internal fun mimeTypeToFileType(mimeType: String?): String = when {
     mimeType == null                -> "other"
     mimeType.startsWith("video/")  -> "video"
     mimeType.startsWith("text/")   -> "txt"
-    mimeType == "application/pdf"  -> "txt"
     else                           -> "other"
 }
 

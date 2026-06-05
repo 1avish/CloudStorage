@@ -395,7 +395,7 @@ fun FileListScreen(
                 },
                 onUploadDoc = {
                     showCreateSheet = false
-                    filePickerLauncher.launch(arrayOf("application/pdf", "text/plain"))
+                    filePickerLauncher.launch(arrayOf("text/plain"))
                 }
             )
         }
