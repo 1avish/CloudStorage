@@ -32,7 +32,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -48,6 +47,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -142,12 +142,6 @@ fun FileListScreen(
         viewModel.navigateBack()
     }
 
-    // ── 性能监测（测试完连同 FileListPerfMonitor 一起删除）──
-    DisposableEffect(Unit) {
-        FileListPerfMonitor.start()
-        onDispose { FileListPerfMonitor.stop() }
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -238,6 +232,7 @@ fun FileListScreen(
                         state = listState,
                         modifier = Modifier
                             .fillMaxSize()
+                            .testTag("file_list")
                             .padding(horizontal = 4.w.dp),
                         contentPadding = PaddingValues(
                             bottom = if (isSelectionMode) 180.w.dp else 96.w.dp

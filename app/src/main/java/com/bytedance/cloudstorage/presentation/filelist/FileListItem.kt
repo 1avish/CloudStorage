@@ -60,7 +60,6 @@ internal fun FileListItem(
     onFolderClick: ((String) -> Unit)? = null,
     onFileClick: (() -> Unit)? = null,
 ) {
-    TrackRecompose(file.id)
     val (icon, iconBg, iconTint) = remember(file.type) { fileStyle(file.type) }
     val formattedSize = remember(file.size, file.type) {
         if (file.type != FileType.Folder && file.size > 0) formatFileSize(file.size) else null
