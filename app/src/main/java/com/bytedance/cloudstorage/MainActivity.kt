@@ -1,5 +1,6 @@
 package com.bytedance.cloudstorage
 
+import android.content.pm.ActivityInfo
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +14,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
 
         // 初始化 ScreenUtils，基准设计稿宽度 390px
         ScreenUtils.init(this, designWidth = 390f)

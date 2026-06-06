@@ -9,8 +9,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.bytedance.cloudstorage.presentation.common.MainTopBar
@@ -19,6 +22,7 @@ import com.bytedance.cloudstorage.presentation.filelist.FileListViewModel
 import com.bytedance.cloudstorage.presentation.home.HomeScreen
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun MainScreen(
     onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
@@ -39,7 +43,9 @@ fun MainScreen(
     val selectedCount by fileListViewModel.selectedCount.collectAsStateWithLifecycle()
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics { testTagsAsResourceId = true },
         topBar = {
             MainTopBar(
                 selectedTab = pagerState.currentPage,

@@ -4,6 +4,7 @@
 /.idea/
 .DS_Store
 /build
+build/
 /captures
 .externalNativeBuild
 .cxx
@@ -18,6 +19,11 @@ docs/
 
 # Claude Code
 .claude/
+
+# Performance investigation artifacts
+FILE_TAB_JANK_REPORT.md
+basline.trace
+app/src/main/generated/
 
 # Understand-Anything
 .understand-anything/

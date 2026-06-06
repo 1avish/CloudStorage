@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -221,6 +222,7 @@ private fun TabBar(
         tabs.forEachIndexed { index, title ->
             TabItem(
                 title = title,
+                testTag = if (index == 1) "main_tab_files" else "main_tab_home",
                 isSelected = selectedTab == index,
                 onClick = { onTabSelected(index) }
             )
@@ -235,11 +237,13 @@ private fun TabBar(
 @Composable
 private fun TabItem(
     title: String,
+    testTag: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
     Box(
         modifier = Modifier
+            .testTag(testTag)
             .clickable(onClick = onClick)
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center

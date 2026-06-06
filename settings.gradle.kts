@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Cloud Storage"
 include(":app")
+include(":baselineprofile")

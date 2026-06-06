@@ -24,6 +24,7 @@ CloudStorage 是一个基于 Kotlin 与 Jetpack Compose 实现的 Android 网盘
 | 数据 | Room、Mock JSON 数据源 |
 | 导航 | Navigation Compose |
 | 媒体 | Media3 ExoPlayer、Coil |
+| 性能 | Baseline Profile、Android Studio Profiler / Perfetto |
 
 ## 目录结构
 
@@ -32,6 +33,7 @@ CloudStorage/
 ├── app/                         # Android App 模块
 │   └── src/main/
 │       ├── assets/              # Mock 数据，默认读取 mock_files.json
+│       ├── generated/           # Baseline Profile 生成结果
 │       ├── java/com/bytedance/cloudstorage/
 │       │   ├── data/            # 数据源、Repository、Room、DTO/Entity/Mapper
 │       │   ├── domain/          # 领域模型
@@ -40,6 +42,7 @@ CloudStorage/
 │       │   ├── ui/theme/        # 主题
 │       │   └── utils/           # 工具类
 │       └── res/                 # Android 资源
+├── baselineprofile/             # Macrobenchmark / Baseline Profile 生成模块
 ├── docs/                        # 需求、设计、架构、测试等文档
 ├── gradle/libs.versions.toml    # 依赖版本管理
 ├── build.gradle.kts             # 根 Gradle 配置
@@ -107,14 +110,16 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ### 5. 运行 App
 
-方式一：使用 Android Studio
+Debug 包适合功能调试，不适合作为性能验收依据。Compose Debug、调试信息和 Studio 启动链路会明显影响首次滑动表现。
+
+#### 方式一：使用 Android Studio 运行 Debug
 
 1. 打开项目根目录。
 2. 选择 `app` 运行配置。
 3. 连接真机或启动模拟器。
 4. 点击 Run。
 
-方式二：使用命令行安装到已连接设备
+#### 方式二：使用命令行安装 Debug
 
 ```bash
 # Windows
@@ -125,6 +130,42 @@ app/build/outputs/apk/debug/app-debug.apk
 ```
 
 如果连接了多台设备，请先通过 `adb devices` 确认目标设备。
+
+### 6. Release 性能验证启动方式
+
+文件 Tab 首次滑动性能、Baseline Profile 效果、Profiler / Perfetto trace 采集，都应使用 release 包验证。
+
+Windows PowerShell 示例：
+
+```powershell
+Set-Location "E:\byteDance\CloudStorage"
+
+$env:JAVA_HOME="$env:USERPROFILE\.cache\codex-jdks\temurin17\jdk-17.0.19+10"
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+
+.\gradlew.bat :app:assembleRelease
+
+$unsigned="E:\byteDance\CloudStorage\app\build\outputs\apk\release\app-release-unsigned.apk"
+$signed="E:\byteDance\CloudStorage\app\build\outputs\apk\release\app-release-debugsigned.apk"
+
+Copy-Item -LiteralPath $unsigned -Destination $signed -Force
+
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\37.0.0\apksigner.bat" sign --ks "$env:USERPROFILE\.android\debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android $signed
+
+$adb="$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe"
+& $adb install -r $signed
+& $adb shell am force-stop com.bytedance.cloudstorage
+& $adb shell monkey -p com.bytedance.cloudstorage -c android.intent.category.LAUNCHER 1
+```
+
+如果修改了关键启动路径或文件列表滑动路径，需要重新生成 Baseline Profile：
+
+```powershell
+.\gradlew.bat :app:generateBaselineProfile
+.\gradlew.bat :app:assembleRelease
+```
+
+Release 包已声明 `<profileable android:shell="true" />`，可以在 Android Studio Profiler 中 attach 到 `com.bytedance.cloudstorage` 进程采集 System Trace。不要用 Run/Debug 启动 App 后再测性能。
 
 ## Mock 数据说明
 
