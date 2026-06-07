@@ -160,8 +160,16 @@ class ShareLinkStore(context: Context) {
     }
 }
 
+// ────────────────────────────────────────────────
+// 分享链接处理状态枚举
+// ────────────────────────────────────────────────
+
+/** 分享链接被用户处理的方式 */
 enum class ShareLinkHandledAction(val value: String) {
+    /** 用户点击「立即查看」进入了分享文件列表 */
     Opened("opened"),
+    /** 用户点击「保存」将分享文件转存到自己网盘 */
     Saved("saved"),
+    /** 用户点击「关闭」/「取消」关闭了弹窗 */
     Dismissed("dismissed"),
 }

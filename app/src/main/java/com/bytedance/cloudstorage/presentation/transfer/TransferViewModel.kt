@@ -11,11 +11,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
+// ────────────────────────────────────────────────
+// 传输页面 ViewModel 及数据模型
+// ────────────────────────────────────────────────
+
+/** 传输方向筛选项 */
 enum class TransferDirectionFilter(val value: String) {
     Upload("upload"),
     Download("download"),
 }
 
+/** 传输状态筛选项 */
 enum class TransferStatusFilter(val value: String?) {
     All(null),
     Completed("completed"),
@@ -23,6 +29,11 @@ enum class TransferStatusFilter(val value: String?) {
     Failed("failed"),
 }
 
+/**
+ * 传输记录 UI 模型
+ *
+ * 由 TransferRecordEntity 转换而来，供 Compose UI 直接使用。
+ */
 data class TransferRecordUi(
     val id: String,
     val fileId: String?,
@@ -36,6 +47,7 @@ data class TransferRecordUi(
     val createdAt: Long,
 )
 
+/** 传输列表 UI 状态，按方向（上传/下载）分别持有 */
 data class TransferUiState(
     val records: List<TransferRecordUi> = emptyList(),
     val allCount: Int = 0,
@@ -44,6 +56,12 @@ data class TransferUiState(
     val failedCount: Int = 0,
 )
 
+/**
+ * 传输列表 ViewModel
+ *
+ * 从 Room 数据库观察上传和下载的传输记录，
+ * 转换为 UI 模型后通过 StateFlow 推送给 TransferScreen。
+ */
 class TransferViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getInstance(application).transferRecordDao()
 

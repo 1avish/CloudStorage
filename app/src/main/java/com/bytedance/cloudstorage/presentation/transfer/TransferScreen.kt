@@ -64,6 +64,14 @@ private val PageBg = Color.White
 private val TextPrimary = Color(0xFF1D2129)
 private val TextSecondary = Color(0xFF8C8C8C)
 
+/**
+ * 传输记录页面主入口
+ *
+ * 展示上传和下载的历史记录，支持按方向（上传/下载）和状态（全部/已完成/进行中/失败）筛选。
+ *
+ * @param onBack 返回回调
+ * @param viewModel 传输列表 ViewModel
+ */
 @Composable
 fun TransferScreen(
     onBack: () -> Unit = {},
@@ -110,6 +118,7 @@ fun TransferScreen(
     }
 }
 
+// 顶部导航栏（返回按钮 + 上传/下载 Tab 切换）
 @Composable
 private fun TransferTopBar(
     direction: TransferDirectionFilter,
@@ -167,6 +176,7 @@ private fun TransferTopBar(
     }
 }
 
+// 上传/下载 Tab 切换项
 @Composable
 private fun DirectionTab(
     title: String,
@@ -183,6 +193,7 @@ private fun DirectionTab(
     )
 }
 
+// 状态筛选胶囊栏（全部 / 已完成 / 上传中 / 失败）
 @Composable
 private fun StatusFilterBar(
     direction: TransferDirectionFilter,
@@ -257,6 +268,7 @@ private fun StatusFilterBar(
     }
 }
 
+// 传输记录列表（按日期分组）
 @Composable
 private fun TransferList(
     records: List<TransferRecordUi>,
@@ -323,6 +335,7 @@ private fun TransferList(
     }
 }
 
+// 单条传输记录行
 @Composable
 private fun TransferRecordRow(record: TransferRecordUi) {
     Row(
@@ -355,6 +368,7 @@ private fun TransferRecordRow(record: TransferRecordUi) {
     }
 }
 
+// 传输记录文件类型图标
 @Composable
 private fun TransferFileIcon(record: TransferRecordUi) {
     val (icon, iconBg, iconTint) = remember(record.type) { fileStyle(record.type) }

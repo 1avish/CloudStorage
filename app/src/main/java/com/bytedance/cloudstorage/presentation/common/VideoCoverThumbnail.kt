@@ -1,5 +1,9 @@
 package com.bytedance.cloudstorage.presentation.common
 
+// ────────────────────────────────────────────────
+// 视频封面缩略图组件（支持播放图标叠加）
+// ────────────────────────────────────────────────
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size

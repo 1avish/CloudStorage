@@ -37,7 +37,9 @@ abstract class AppDatabase : RoomDatabase() {
 
     /** 提供 FileDao 实例，Room 自动生成实现 */
     abstract fun fileDao(): FileDao
+    /** 提供 ShareLinkDao 实例 */
     abstract fun shareLinkDao(): ShareLinkDao
+    /** 提供 TransferRecordDao 实例 */
     abstract fun transferRecordDao(): TransferRecordDao
 
     companion object {
@@ -50,12 +52,14 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        /** v1→v2: 新增视频封面 URI 字段 */
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE files ADD COLUMN coverUri TEXT")
             }
         }
 
+        /** v2→v3: 新增分享链接相关表（share_links、share_link_files） */
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
@@ -81,6 +85,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3→v4: 新增传输记录表（transfer_records） */
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""

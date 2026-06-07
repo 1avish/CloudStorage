@@ -22,6 +22,16 @@ import com.bytedance.cloudstorage.presentation.filelist.FileListViewModel
 import com.bytedance.cloudstorage.presentation.home.HomeScreen
 import kotlinx.coroutines.launch
 
+// ────────────────────────────────────────────────
+// 主页面（HorizontalPager + 顶部导航栏）
+// ────────────────────────────────────────────────
+
+/**
+ * 应用主页面，包含「网盘」和「文件」两个 Tab 的水平滑动切换。
+ *
+ * 使用 HorizontalPager 实现左右滑动切换，顶部 MainTopBar 提供 Tab 切换入口。
+ * 文件 Tab 的 ViewModel 在此处创建并注入，保证文件列表状态在 Tab 切换时保持不变。
+ */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun MainScreen(

@@ -286,7 +286,7 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    /** 重命名文件 */
+    /** 下载选中文件到本地 Download 目录 */
     fun downloadSelectedFiles() {
         val ids = files.value.map { it.id }.filter { it in _selectedFileIds.value }
         if (ids.isEmpty()) {

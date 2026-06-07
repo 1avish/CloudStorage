@@ -5,6 +5,13 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * Room 实体：分享链接主表
+ *
+ * 以 token 为主键，记录分享创建时间和处理状态。
+ * - handledAt / handledAction: 记录用户是否已查看/保存/关闭该链接
+ * - isDeleted: 逻辑删除标记
+ */
 @Entity(tableName = "share_links")
 data class ShareLinkEntity(
     @PrimaryKey
@@ -15,6 +22,12 @@ data class ShareLinkEntity(
     val isDeleted: Boolean = false,
 )
 
+/**
+ * Room 实体：分享链接关联的文件表
+ *
+ * 一条分享链接可以关联多个文件（一对多）。
+ * 外键关联 share_links 表，主键删除时级联删除关联记录。
+ */
 @Entity(
     tableName = "share_link_files",
     primaryKeys = ["token", "fileId"],

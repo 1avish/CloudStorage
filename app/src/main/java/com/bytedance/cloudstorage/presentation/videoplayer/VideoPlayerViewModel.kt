@@ -26,6 +26,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+// ────────────────────────────────────────────────
+// 视频播放页 ViewModel
+// ────────────────────────────────────────────────
+
+/**
+ * 选集项数据模型
+ *
+ * 描述一个可播放的视频剧集，用于选集列表和播放器状态管理。
+ *
+ * @property id        文件 ID
+ * @property title     显示名称
+ * @property duration  时长文本
+ * @property uri       播放地址
+ * @property size      文件大小（字节）
+ * @property updatedAt 更新时间戳
+ * @property coverUri  封面图片本地 URI
+ */
 data class Episode(
     val id: String,
     val title: String,
@@ -36,6 +53,12 @@ data class Episode(
     val coverUri: String? = null,
 )
 
+/**
+ * 视频播放 ViewModel
+ *
+ * 管理 ExoPlayer 实例、播放状态、倍速、进度、选集列表，
+ * 同时处理视频的删除、重命名、下载等文件操作。
+ */
 class VideoPlayerViewModel(application: Application) : AndroidViewModel(application) {
 
     var exoPlayer: ExoPlayer? = null

@@ -36,7 +36,6 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     val usedStorageG: StateFlow<Float> = _usedStorageG.asStateFlow()
 
     private val _totalStorageG = MutableStateFlow(10f)
-    // 第37行，不用改，保持 10f 即可
     val totalStorageG: StateFlow<Float> = _totalStorageG.asStateFlow()
 
     private val _recentViews = MutableStateFlow<List<RecentFileWithFolderInfo>>(emptyList())
