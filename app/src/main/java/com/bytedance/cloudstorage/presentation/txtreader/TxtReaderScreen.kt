@@ -1,39 +1,64 @@
 package com.bytedance.cloudstorage.presentation.txtreader
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import android.os.Debug
 import android.os.SystemClock
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.FormatLineSpacing
+import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
@@ -42,6 +67,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -63,14 +89,43 @@ import kotlin.math.max
 import kotlin.math.min
 
 // ── 主题色 ──
-private val ReaderBg = Color(0xFFF6F6F6)
 private val ReaderSurface = Color(0xFFF6F6F6)
 private val ReaderText = Color(0xFF111827)
 private val ReaderSubText = Color(0xFF8B919E)
 private val ReaderBlue = Color(0xFF3370FF)
+private val ReaderSkyBlue = Color(0xFF40B8FF)
+private val ReaderPanelSurface = Color.White
+private val ReaderControlBg = Color(0xFFF3F5F8)
+private val ReaderDivider = Color(0xFFE8ECF2)
+
+// 阅读器底部设置面板的 4 个 Tab 页
+private enum class ReaderSettingPanel {
+    Brightness,   // 亮度
+    Background,   // 背景色
+    Font,         // 字号（A-/A+）
+    LineSpacing   // 行间距（小/较小/适中/大）
+}
+
+// 背景色选项：浅灰（默认）、米黄、浅绿、粉色、纯黑（暗黑模式）
+private val ReaderBackgroundOptions = listOf(
+    Color(0xFFF6F6F6),
+    Color(0xFFEFE0BF),
+    Color(0xFFE1ECD6),
+    Color(0xFFF3DDDD),
+    Color(0xFF000000)
+)
+
+// 字号候选值（单位 sp，通过 .ws 缩放），默认 index=2 → 24sp
+private val ReaderFontSizes = listOf(20, 22, 24, 26, 28, 30)
+// 行高候选值（与字号一一对应，保持约 1.75 行距比），默认 index=2 → 42sp
+private val ReaderLineHeights = listOf(34, 38, 42, 48)
+// 行间距档位标签，与 ReaderLineHeights 一一对应
+private val ReaderLineSpacingLabels = listOf("小", "较小", "适中", "大")
 
 // 每次从文件读取的缓冲区大小（16KB），影响 I/O 次数
 // 调试日志开关：设为 true 打开分页性能日志，false 关闭
+private const val READER_SETTING_ROW_HEIGHT = 56
+private const val READER_BOTTOM_BAR_ITEM_HEIGHT = 44
 private const val DEBUG_READER_LOG = false
 
 private const val READ_BUFFER_SIZE = 16 * 1024
@@ -146,11 +201,13 @@ fun TxtReaderScreen(
 private fun TxtReaderTopBar(
     fileName: String,
     onBack: () -> Unit,
+    surfaceColor: Color,
+    contentColor: Color,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ReaderSurface)
+            .background(surfaceColor)
             .statusBarsPadding()
             .height(56.w.dp)
             .padding(horizontal = 8.w.dp),
@@ -160,7 +217,7 @@ private fun TxtReaderTopBar(
             Icon(
                 imageVector = Icons.Default.ArrowBack,
                 contentDescription = "返回",
-                tint = ReaderSubText
+                tint = contentColor
             )
         }
         Text(
@@ -168,7 +225,7 @@ private fun TxtReaderTopBar(
             modifier = Modifier.weight(1f),
             fontSize = 16.ws.sp,
             fontWeight = FontWeight.Medium,
-            color = ReaderSubText,
+            color = contentColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -218,14 +275,58 @@ private fun TxtPagerContent(
     val context = LocalContext.current
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
+    // ── 阅读器设置面板状态（切换文件时重置）──
+    var isReaderMenuVisible by remember(fileKey) { mutableStateOf(false) }
+    var activeSettingPanel by remember(fileKey) { mutableStateOf<ReaderSettingPanel?>(null) }
+    var brightness by remember(fileKey) { mutableFloatStateOf(0.65f) }        // 手动亮度 0.05~1.0
+    var useSystemBrightness by remember(fileKey) { mutableStateOf(true) }     // 是否跟随系统亮度
+    var backgroundIndex by remember(fileKey) { mutableIntStateOf(0) }         // ReaderBackgroundOptions 下标
+    var fontSizeIndex by remember(fileKey) { mutableIntStateOf(2) }           // ReaderFontSizes 下标，默认 24sp
+    var lineSpacingIndex by remember(fileKey) { mutableIntStateOf(2) }        // ReaderLineHeights 下标，默认 42sp
+    val readerSurface = ReaderBackgroundOptions[backgroundIndex]
+    val isDarkReader = readerSurface == Color.Black  // 最后一个选项为纯黑 → 暗黑模式
+    // 暗黑模式下切换文字颜色，保证对比度
+    val readerText = if (isDarkReader) Color(0xFFEDEFF3) else ReaderText
+    val readerSubText = if (isDarkReader) Color(0xFF9CA3AF) else ReaderSubText
     val bodyStyle = TextStyle(
-        color = ReaderText,
-        fontSize = 24.ws.sp,
-        lineHeight = 42.ws.sp,
+        color = readerText,
+        fontSize = ReaderFontSizes[fontSizeIndex].ws.sp,
+        lineHeight = ReaderLineHeights[lineSpacingIndex].ws.sp,
         fontFamily = FontFamily.SansSerif
     )
     val horizontalPadding = 24.w.dp
     val verticalPadding = 36.w.dp
+    // ── 亮度管理：通过 Window.screenBrightness 控制屏幕亮度 ──
+    // 保存用户进入阅读器前的原始亮度，退出时恢复
+    val activity = remember(context) { context.findActivity() }
+    val originalBrightness = remember(activity) {
+        activity?.window?.attributes?.screenBrightness
+            ?: android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+    }
+
+    // 跟随系统 / 手动调节实时生效
+    LaunchedEffect(activity, brightness, useSystemBrightness) {
+        activity?.window?.let { window ->
+            val attributes = window.attributes
+            attributes.screenBrightness = if (useSystemBrightness) {
+                android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            } else {
+                brightness.coerceIn(0.05f, 1f)
+            }
+            window.attributes = attributes
+        }
+    }
+
+    // 退出阅读器时，将亮度恢复为用户进入前的原始值
+    DisposableEffect(activity) {
+        onDispose {
+            activity?.window?.let { window ->
+                val attributes = window.attributes
+                attributes.screenBrightness = originalBrightness
+                window.attributes = attributes
+            }
+        }
+    }
 
     // pages 是响应式列表：每算出一页就 add 一次，Compose 自动重组 UI
     val pages = remember(fileKey) { mutableStateListOf<String>() }
@@ -234,169 +335,619 @@ private fun TxtPagerContent(
     // pageCount 用 lambda 传入，pages.size 变化时 HorizontalPager 自动扩展
     val pagerState = rememberPagerState(pageCount = { pages.size })
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ReaderSurface)
+            .background(readerSurface)
     ) {
-        TxtReaderTopBar(fileName = fileName, onBack = onBack)
-
-        BoxWithConstraints(
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(ReaderSurface)
+                .fillMaxSize()
+                .background(readerSurface)
         ) {
-            // 从 BoxWithConstraints 拿到可用宽高，计算每页能放多少行
-            val availableWidth = this.maxWidth
-            val availableHeight = this.maxHeight
-            val contentWidthPx = with(density) {
-                (availableWidth - horizontalPadding * 2).roundToPx()
-            }.coerceAtLeast(1)
-            val contentHeightPx = with(density) {
-                (availableHeight - verticalPadding * 2).roundToPx()
-            }.coerceAtLeast(1)
-            val lineHeightPx = with(density) { bodyStyle.lineHeight.toPx() }.coerceAtLeast(1f)
-            val maxLines = max(1, floor(contentHeightPx / lineHeightPx).toInt())
+            TxtReaderTopBar(
+                fileName = fileName,
+                onBack = onBack,
+                surfaceColor = readerSurface,
+                contentColor = readerSubText
+            )
 
-            // 核心：文件/屏幕变化时重新分页
-            // 在 Dispatchers.Default（后台线程）执行流式分页
-            // 每算完一页通过 onPage 回调切回主线程 add 到 pages
-            LaunchedEffect(fileKey, fileName, fileUri, contentWidthPx, maxLines, bodyStyle) {
-                val db = AppDatabase.getInstance(context)
-                withContext(Dispatchers.IO) {
-                    db.fileDao().updateLastOpenedAt(fileId, System.currentTimeMillis())
-                }
-                pages.clear()
-                isPaginating = true
-                errorMessage = null
-                if (pagerState.currentPage != 0) {
-                    pagerState.scrollToPage(0)
-                }
+            BoxWithConstraints(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(readerSurface)
+            ) {
+                // 从 BoxWithConstraints 拿到可用宽高，计算每页能放多少行
+                val availableWidth = this.maxWidth
+                val availableHeight = this.maxHeight
+                val contentWidthPx = with(density) {
+                    (availableWidth - horizontalPadding * 2).roundToPx()
+                }.coerceAtLeast(1)
+                val contentHeightPx = with(density) {
+                    (availableHeight - verticalPadding * 2).roundToPx()
+                }.coerceAtLeast(1)
+                val lineHeightPx = with(density) { bodyStyle.lineHeight.toPx() }.coerceAtLeast(1f)
+                val maxLines = max(1, floor(contentHeightPx / lineHeightPx).toInt())
 
-                val paginationStartMs: Long
-                var firstPageLogged = false
-                if (DEBUG_READER_LOG) {
-                    paginationStartMs = SystemClock.elapsedRealtime()
-                    logReaderMetric(
-                        event = "start",
-                        fileName = fileName,
-                        pages = 0,
-                        startMs = paginationStartMs,
-                        extra = "width_px=$contentWidthPx max_lines_per_page=$maxLines"
-                    )
-                } else {
-                    paginationStartMs = 0L
-                }
-
-                runCatching {
-                    val charset = withContext(Dispatchers.IO) {
-                        detectCharset(context.applicationContext, fileUri)
+                // 核心：文件/屏幕变化时重新分页
+                // 在 Dispatchers.Default（后台线程）执行流式分页
+                // 每算完一页通过 onPage 回调切回主线程 add 到 pages
+                LaunchedEffect(fileKey, fileName, fileUri, contentWidthPx, maxLines, fontSizeIndex, lineSpacingIndex) {
+                    val db = AppDatabase.getInstance(context)
+                    withContext(Dispatchers.IO) {
+                        db.fileDao().updateLastOpenedAt(fileId, System.currentTimeMillis())
                     }
-                    withContext(Dispatchers.Default) {
-                        paginateTxtStream(
-                            context = context.applicationContext,
+                    pages.clear()
+                    isPaginating = true
+                    errorMessage = null
+                    if (pagerState.currentPage != 0) {
+                        pagerState.scrollToPage(0)
+                    }
+
+                    val paginationStartMs: Long
+                    var firstPageLogged = false
+                    if (DEBUG_READER_LOG) {
+                        paginationStartMs = SystemClock.elapsedRealtime()
+                        logReaderMetric(
+                            event = "start",
                             fileName = fileName,
-                            fileUri = fileUri,
-                            charset = charset,
-                            textMeasurer = textMeasurer,
-                            style = bodyStyle,
-                            maxWidthPx = contentWidthPx,
-                            maxLinesPerPage = maxLines
-                        ) { pageText ->
-                            // 每算完一页，切回主线程更新 UI
-                            withContext(Dispatchers.Main.immediate) {
-                                pages.add(pageText)
-                                if (DEBUG_READER_LOG && !firstPageLogged) {
-                                    firstPageLogged = true
-                                    logReaderMetric(
-                                        event = "first_page",
-                                        fileName = fileName,
-                                        pages = pages.size,
-                                        startMs = paginationStartMs
-                                    )
-                                } else if (DEBUG_READER_LOG && pages.size % LOG_PROGRESS_PAGE_INTERVAL == 0) {
-                                    logReaderMetric(
-                                        event = "progress",
-                                        fileName = fileName,
-                                        pages = pages.size,
-                                        startMs = paginationStartMs
-                                    )
+                            pages = 0,
+                            startMs = paginationStartMs,
+                            extra = "width_px=$contentWidthPx max_lines_per_page=$maxLines"
+                        )
+                    } else {
+                        paginationStartMs = 0L
+                    }
+
+                    runCatching {
+                        val charset = withContext(Dispatchers.IO) {
+                            detectCharset(context.applicationContext, fileUri)
+                        }
+                        withContext(Dispatchers.Default) {
+                            paginateTxtStream(
+                                context = context.applicationContext,
+                                fileName = fileName,
+                                fileUri = fileUri,
+                                charset = charset,
+                                textMeasurer = textMeasurer,
+                                style = bodyStyle,
+                                maxWidthPx = contentWidthPx,
+                                maxLinesPerPage = maxLines
+                            ) { pageText ->
+                                // 每算完一页，切回主线程更新 UI
+                                withContext(Dispatchers.Main.immediate) {
+                                    pages.add(pageText)
+                                    if (DEBUG_READER_LOG && !firstPageLogged) {
+                                        firstPageLogged = true
+                                        logReaderMetric(
+                                            event = "first_page",
+                                            fileName = fileName,
+                                            pages = pages.size,
+                                            startMs = paginationStartMs
+                                        )
+                                    } else if (DEBUG_READER_LOG && pages.size % LOG_PROGRESS_PAGE_INTERVAL == 0) {
+                                        logReaderMetric(
+                                            event = "progress",
+                                            fileName = fileName,
+                                            pages = pages.size,
+                                            startMs = paginationStartMs
+                                        )
+                                    }
                                 }
                             }
                         }
+                    }.onFailure { throwable ->
+                        errorMessage = throwable.message ?: "文本读取失败"
+                        if (DEBUG_READER_LOG) {
+                            logReaderMetric(
+                                event = "error",
+                                fileName = fileName,
+                                pages = pages.size,
+                                startMs = paginationStartMs,
+                                extra = "message=${throwable.message.orEmpty()}"
+                            )
+                        }
                     }
-                }.onFailure { throwable ->
-                    errorMessage = throwable.message ?: "文本读取失败"
-                    if (DEBUG_READER_LOG) {
+
+                    // 兜底：文件为空时至少显示一页
+                    if (pages.isEmpty() && errorMessage == null) {
+                        pages.add(" ")
+                    }
+                    isPaginating = false
+                    if (errorMessage == null && DEBUG_READER_LOG) {
                         logReaderMetric(
-                            event = "error",
+                            event = "complete",
                             fileName = fileName,
                             pages = pages.size,
-                            startMs = paginationStartMs,
-                            extra = "message=${throwable.message.orEmpty()}"
+                            startMs = paginationStartMs
                         )
+                    }
+                    // 防止当前页码越界
+                    if (pagerState.currentPage >= pages.size) {
+                        pagerState.scrollToPage((pages.lastIndex).coerceAtLeast(0))
                     }
                 }
 
-                // 兜底：文件为空时至少显示一页
-                if (pages.isEmpty() && errorMessage == null) {
-                    pages.add(" ")
-                }
-                isPaginating = false
-                if (errorMessage == null && DEBUG_READER_LOG) {
-                    logReaderMetric(
-                        event = "complete",
-                        fileName = fileName,
-                        pages = pages.size,
-                        startMs = paginationStartMs
-                    )
-                }
-                // 防止当前页码越界
-                if (pagerState.currentPage >= pages.size) {
-                    pagerState.scrollToPage((pages.lastIndex).coerceAtLeast(0))
-                }
-            }
-
-            // 三态渲染：有页 → 渲染翻页；有错误 → 错误页；否则 → loading
-            when {
-                pages.isNotEmpty() -> {
-                    HorizontalPager(
-                        state = pagerState,
-                        userScrollEnabled = pages.size > 1,
-                        modifier = Modifier.fillMaxSize()
-                    ) { page ->
-                        Text(
-                            text = pages.getOrElse(page) { "" },
+                // 三态渲染：有页 → 渲染翻页；有错误 → 错误页；否则 → loading
+                when {
+                    pages.isNotEmpty() -> {
+                        HorizontalPager(
+                            state = pagerState,
+                            userScrollEnabled = pages.size > 1,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
-                            style = bodyStyle,
-                            overflow = TextOverflow.Clip
-                        )
+                                // 点击正文区域：菜单可见时收起，不可见时呼出
+                                .pointerInput(Unit) {
+                                    detectTapGestures {
+                                        if (isReaderMenuVisible) {
+                                            isReaderMenuVisible = false
+                                            activeSettingPanel = null
+                                        } else {
+                                            isReaderMenuVisible = true
+                                        }
+                                    }
+                                }
+                        ) { page ->
+                            Text(
+                                text = pages.getOrElse(page) { "" },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = horizontalPadding, vertical = verticalPadding),
+                                style = bodyStyle,
+                                overflow = TextOverflow.Clip
+                            )
+                        }
                     }
+                    errorMessage != null -> ErrorContent(errorMessage.orEmpty())
+                    else -> LoadingContent()
                 }
-                errorMessage != null -> ErrorContent(errorMessage.orEmpty())
-                else -> LoadingContent()
             }
+
+            TxtReaderFooter(
+                currentPage = pagerState.currentPage,
+                pageCount = pages.size.coerceAtLeast(1),
+                isPaginating = isPaginating,
+                surfaceColor = readerSurface,
+                contentColor = readerSubText
+            )
         }
 
-        TxtReaderFooter(
-            currentPage = pagerState.currentPage,
-            pageCount = pages.size.coerceAtLeast(1),
-            isPaginating = isPaginating
-        )
+        // 菜单可见时，在 Box 底部叠加渲染设置面板（浮于正文之上）
+        if (isReaderMenuVisible) {
+            ReaderSettingsOverlay(
+                activePanel = activeSettingPanel,
+                onActivePanelChange = { activeSettingPanel = it },
+                brightness = brightness,
+                onBrightnessChange = {
+                    brightness = it
+                    useSystemBrightness = false
+                },
+                useSystemBrightness = useSystemBrightness,
+                onUseSystemBrightnessChange = { useSystemBrightness = it },
+                backgroundIndex = backgroundIndex,
+                onBackgroundIndexChange = { backgroundIndex = it },
+                fontSizeIndex = fontSizeIndex,
+                onDecreaseFontSize = { fontSizeIndex = (fontSizeIndex - 1).coerceAtLeast(0) },
+                onIncreaseFontSize = { fontSizeIndex = (fontSizeIndex + 1).coerceAtMost(ReaderFontSizes.lastIndex) },
+                lineSpacingIndex = lineSpacingIndex,
+                onLineSpacingIndexChange = { lineSpacingIndex = it },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
     }
 }
 
 // ── 底部页码指示器 ──
 // 分页未完成时显示 "N/页数计算中"，完成后显示 "N/总数"
 
+// ── 阅读器设置面板：底部 Tab 栏 + 可展开的设置内容 ──
+// 结构：[设置内容行]（可选，点击 Tab 时展开/收起）
+//       [底部 Tab 栏]  亮度 | 背景 | 字体 | 行间距
+@Composable
+private fun ReaderSettingsOverlay(
+    activePanel: ReaderSettingPanel?,
+    onActivePanelChange: (ReaderSettingPanel) -> Unit,
+    brightness: Float,
+    onBrightnessChange: (Float) -> Unit,
+    useSystemBrightness: Boolean,
+    onUseSystemBrightnessChange: (Boolean) -> Unit,
+    backgroundIndex: Int,
+    onBackgroundIndexChange: (Int) -> Unit,
+    fontSizeIndex: Int,
+    onDecreaseFontSize: () -> Unit,
+    onIncreaseFontSize: () -> Unit,
+    lineSpacingIndex: Int,
+    onLineSpacingIndexChange: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        activePanel?.let { panel ->
+            ReaderSettingPanelContent(
+                panel = panel,
+                brightness = brightness,
+                onBrightnessChange = onBrightnessChange,
+                useSystemBrightness = useSystemBrightness,
+                onUseSystemBrightnessChange = onUseSystemBrightnessChange,
+                backgroundIndex = backgroundIndex,
+                onBackgroundIndexChange = onBackgroundIndexChange,
+                fontSizeIndex = fontSizeIndex,
+                onDecreaseFontSize = onDecreaseFontSize,
+                onIncreaseFontSize = onIncreaseFontSize,
+                lineSpacingIndex = lineSpacingIndex,
+                onLineSpacingIndexChange = onLineSpacingIndexChange
+            )
+        }
+        ReaderSettingsBottomBar(
+            activePanel = activePanel,
+            onActivePanelChange = onActivePanelChange
+        )
+    }
+}
+
+// 根据当前选中的 Tab 页，渲染对应的设置内容行
+@Composable
+private fun ReaderSettingPanelContent(
+    panel: ReaderSettingPanel,
+    brightness: Float,
+    onBrightnessChange: (Float) -> Unit,
+    useSystemBrightness: Boolean,
+    onUseSystemBrightnessChange: (Boolean) -> Unit,
+    backgroundIndex: Int,
+    onBackgroundIndexChange: (Int) -> Unit,
+    fontSizeIndex: Int,
+    onDecreaseFontSize: () -> Unit,
+    onIncreaseFontSize: () -> Unit,
+    lineSpacingIndex: Int,
+    onLineSpacingIndexChange: (Int) -> Unit,
+) {
+    when (panel) {
+        ReaderSettingPanel.Brightness -> BrightnessSettingRow(
+            brightness = brightness,
+            onBrightnessChange = onBrightnessChange,
+            useSystemBrightness = useSystemBrightness,
+            onUseSystemBrightnessChange = onUseSystemBrightnessChange
+        )
+        ReaderSettingPanel.Background -> BackgroundSettingRow(
+            selectedIndex = backgroundIndex,
+            onSelected = onBackgroundIndexChange
+        )
+        ReaderSettingPanel.Font -> FontSettingRow(
+            fontSizeIndex = fontSizeIndex,
+            onDecrease = onDecreaseFontSize,
+            onIncrease = onIncreaseFontSize
+        )
+        ReaderSettingPanel.LineSpacing -> LineSpacingSettingRow(
+            selectedIndex = lineSpacingIndex,
+            onSelected = onLineSpacingIndexChange
+        )
+    }
+}
+
+// 亮度面板：[小太阳] ──[Slider]── [大太阳]  [○ 跟随系统]
+@Composable
+private fun BrightnessSettingRow(
+    brightness: Float,
+    onBrightnessChange: (Float) -> Unit,
+    useSystemBrightness: Boolean,
+    onUseSystemBrightnessChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(READER_SETTING_ROW_HEIGHT.w.dp)
+            .background(ReaderPanelSurface)
+            .padding(horizontal = 18.w.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Brightness6,
+            contentDescription = null,
+            tint = ReaderSkyBlue,
+            modifier = Modifier.size(22.w.dp)
+        )
+        Slider(
+            value = brightness,
+            onValueChange = onBrightnessChange,
+            valueRange = 0.05f..1f,
+            colors = SliderDefaults.colors(
+                thumbColor = ReaderSkyBlue,
+                activeTrackColor = ReaderSkyBlue,
+                inactiveTrackColor = ReaderSkyBlue.copy(alpha = 0.18f)
+            ),
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 10.w.dp)
+        )
+        Icon(
+            imageVector = Icons.Default.Brightness6,
+            contentDescription = null,
+            tint = ReaderSkyBlue,
+            modifier = Modifier.size(28.w.dp)
+        )
+        Spacer(modifier = Modifier.width(8.w.dp))
+        Row(
+            modifier = Modifier.clickable { onUseSystemBrightnessChange(!useSystemBrightness) },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(
+                selected = useSystemBrightness,
+                onClick = { onUseSystemBrightnessChange(!useSystemBrightness) },
+                colors = RadioButtonDefaults.colors(
+                    selectedColor = ReaderSkyBlue,
+                    unselectedColor = ReaderSkyBlue
+                )
+            )
+            Text(
+                text = "系统亮度",
+                fontSize = 15.ws.sp,
+                color = ReaderSkyBlue,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+// 背景色面板：5 个圆形色块，选中项显示蓝色描边
+@Composable
+private fun BackgroundSettingRow(
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(READER_SETTING_ROW_HEIGHT.w.dp)
+            .background(ReaderPanelSurface)
+            .padding(horizontal = 18.w.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ReaderBackgroundOptions.forEachIndexed { index, color ->
+                val selected = selectedIndex == index
+                Box(
+                    modifier = Modifier
+                        .size(34.w.dp)
+                        .clip(CircleShape)
+                        .background(color)
+                        .border(
+                            width = if (selected) 2.w.dp else 1.w.dp,
+                            color = if (selected) ReaderBlue else ReaderDivider,
+                            shape = CircleShape
+                        )
+                        .clickable { onSelected(index) }
+                )
+            }
+        }
+    }
+}
+
+// 字号面板：[A-]  3/6  [A+]，数字表示当前档位（1~6）
+@Composable
+private fun FontSettingRow(
+    fontSizeIndex: Int,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(READER_SETTING_ROW_HEIGHT.w.dp)
+            .background(ReaderPanelSurface)
+            .padding(horizontal = 36.w.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        ReaderPillButton(
+            text = "A-",
+            enabled = fontSizeIndex > 0,
+            onClick = onDecrease,
+            modifier = Modifier.width(88.w.dp)
+        )
+        Text(
+            text = "${fontSizeIndex + 1}",
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 10.w.dp),
+            fontSize = 18.ws.sp,
+            fontWeight = FontWeight.Medium,
+            color = ReaderText,
+            maxLines = 1,
+            textAlign = TextAlign.Center
+        )
+        ReaderPillButton(
+            text = "A+",
+            enabled = fontSizeIndex < ReaderFontSizes.lastIndex,
+            onClick = onIncrease,
+            modifier = Modifier.width(88.w.dp)
+        )
+    }
+}
+
+// 行间距面板：胶囊 segmented control，4 档可选
+@Composable
+private fun LineSpacingSettingRow(
+    selectedIndex: Int,
+    onSelected: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(READER_SETTING_ROW_HEIGHT.w.dp)
+            .background(ReaderPanelSurface)
+            .padding(horizontal = 18.w.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .height(40.w.dp)
+                .clip(RoundedCornerShape(22.w.dp))
+                .background(ReaderControlBg)
+                .padding(3.w.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ReaderLineSpacingLabels.forEachIndexed { index, label ->
+                val selected = selectedIndex == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(20.w.dp))
+                        .background(if (selected) Color.White else Color.Transparent)
+                        .border(
+                            width = if (selected) 1.w.dp else 0.w.dp,
+                            color = if (selected) ReaderDivider else Color.Transparent,
+                            shape = RoundedCornerShape(20.w.dp)
+                        )
+                        .clickable { onSelected(index) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        fontSize = 15.ws.sp,
+                        fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                        color = if (selected) ReaderText else ReaderSubText,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
+}
+
+// 胶囊按钮（A-/A+），到达边界时半透明 + 禁用点击
+@Composable
+private fun ReaderPillButton(
+    text: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .height(40.w.dp)
+            .clip(RoundedCornerShape(22.w.dp))
+            .background(ReaderControlBg)
+            .clickable(enabled = enabled) { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 17.ws.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (enabled) ReaderSubText else ReaderSubText.copy(alpha = 0.4f),
+            maxLines = 1
+        )
+    }
+}
+
+// 底部 Tab 栏：固定在页面最下方，支持导航栏安全区
+@Composable
+private fun ReaderSettingsBottomBar(
+    activePanel: ReaderSettingPanel?,
+    onActivePanelChange: (ReaderSettingPanel) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ReaderPanelSurface)
+            .border(width = 1.w.dp, color = ReaderDivider)
+            .navigationBarsPadding()
+            .padding(horizontal = 14.w.dp, vertical = 4.w.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ReaderBottomBarItem(
+                label = "亮度",
+                icon = Icons.Default.Brightness6,
+                selected = activePanel == ReaderSettingPanel.Brightness,
+                accentColor = ReaderSkyBlue,
+                onClick = { onActivePanelChange(ReaderSettingPanel.Brightness) },
+                modifier = Modifier.weight(1f)
+            )
+            ReaderBottomBarItem(
+                label = "背景",
+                icon = Icons.Default.Palette,
+                selected = activePanel == ReaderSettingPanel.Background,
+                accentColor = ReaderBlue,
+                onClick = { onActivePanelChange(ReaderSettingPanel.Background) },
+                modifier = Modifier.weight(1f)
+            )
+            ReaderBottomBarItem(
+                label = "字体",
+                icon = Icons.Default.FormatSize,
+                selected = activePanel == ReaderSettingPanel.Font,
+                accentColor = ReaderBlue,
+                onClick = { onActivePanelChange(ReaderSettingPanel.Font) },
+                modifier = Modifier.weight(1f)
+            )
+            ReaderBottomBarItem(
+                label = "行间距",
+                icon = Icons.Default.FormatLineSpacing,
+                selected = activePanel == ReaderSettingPanel.LineSpacing,
+                accentColor = ReaderBlue,
+                onClick = { onActivePanelChange(ReaderSettingPanel.LineSpacing) },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+// 单个 Tab 项：图标 + 标签，selectedColor 由调用方指定（亮度用 SkyBlue，其他用 Blue）
+@Composable
+private fun ReaderBottomBarItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    accentColor: Color,  // 选中态高亮色，不再用字符串判断
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .height(READER_BOTTOM_BAR_ITEM_HEIGHT.w.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (selected) accentColor else ReaderText,
+            modifier = Modifier.size(22.w.dp)
+        )
+        Text(
+            text = label,
+            fontSize = 12.ws.sp,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+            color = if (selected) accentColor else ReaderText,
+            maxLines = 1
+        )
+    }
+}
+
+// 从 Compose 的 Context 中递归解开 ContextWrapper 链，取出宿主 Activity
+// 用于访问 window.attributes.screenBrightness 控制屏幕亮度
+private fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 @Composable
 private fun TxtReaderFooter(
     currentPage: Int,
     pageCount: Int,
     isPaginating: Boolean,
+    surfaceColor: Color,
+    contentColor: Color,
 ) {
     val lastPageIndex = if (isPaginating) -1 else pageCount - 1
     val pageIndicator = if (isPaginating) {
@@ -408,7 +959,7 @@ private fun TxtReaderFooter(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ReaderSurface)
+            .background(surfaceColor)
             .navigationBarsPadding()
             .padding(start = 24.w.dp, end = 24.w.dp, top = 12.w.dp, bottom = 14.w.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -417,14 +968,14 @@ private fun TxtReaderFooter(
             text = if (currentPage == lastPageIndex) "本文阅读完毕" else "",
             modifier = Modifier.weight(1f),
             fontSize = 14.ws.sp,
-            color = ReaderSubText,
+            color = contentColor,
             maxLines = 1
         )
         Text(
             text = pageIndicator,
             fontSize = 14.ws.sp,
             fontWeight = FontWeight.Medium,
-            color = ReaderSubText,
+            color = contentColor,
             maxLines = 1
         )
     }
