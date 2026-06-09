@@ -15,6 +15,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -24,6 +26,8 @@ import androidx.navigation.navArgument
 import com.bytedance.cloudstorage.data.share.ShareLinkHandledAction
 import com.bytedance.cloudstorage.data.share.ShareLinkStore
 import com.bytedance.cloudstorage.presentation.MainScreen
+import com.bytedance.cloudstorage.presentation.home.AllRecentRecordsScreen
+import com.bytedance.cloudstorage.presentation.home.HomeViewModel
 import com.bytedance.cloudstorage.presentation.share.ShareLinkPromptDialog
 import com.bytedance.cloudstorage.presentation.share.ShareListScreen
 import com.bytedance.cloudstorage.presentation.transfer.TransferScreen
@@ -40,6 +44,8 @@ object Screen {
     const val TxtReader = "txtreader/{fileId}/{fileName}/{fileUri}"
     /** 分享文件列表页，token 从 deeplink 或剪贴板解析得到 */
     const val ShareList = "share/{token}"
+    /** 全部最近记录页，type = "views" | "saves" */
+    const val AllRecords = "allrecords/{type}"
     private const val EmptyArg = "__empty__"
 
     fun videoPlayer(fileId: String, fileName: String, fileUri: String): String {
@@ -57,6 +63,8 @@ object Screen {
     }
 
     fun shareList(token: String): String = "share/${encodeRouteArg(token)}"
+
+    fun allRecords(type: String): String = "allrecords/${encodeRouteArg(type)}"
 
     fun decodeRouteArg(value: String): String {
         if (value.isBlank()) return ""
@@ -118,6 +126,12 @@ fun AppNavGraph(
                 },
                 onOpenTransfer = {
                     navController.navigate(Screen.Transfer)
+                },
+                onShowAllViews = {
+                    navController.navigate(Screen.allRecords("views"))
+                },
+                onShowAllSaves = {
+                    navController.navigate(Screen.allRecords("saves"))
                 }
             )
         }
@@ -189,6 +203,34 @@ fun AppNavGraph(
             val token = Screen.decodeRouteArg(backStackEntry.arguments?.getString("token") ?: "")
             ShareListScreen(
                 token = token,
+                onBack = { navController.popBackStack() },
+                onOpenVideo = { fileId, fileName, fileUri ->
+                    navController.navigate(Screen.videoPlayer(fileId, fileName, fileUri))
+                },
+                onOpenTxt = { fileId, fileName, fileUri ->
+                    navController.navigate(Screen.txtReader(fileId, fileName, fileUri))
+                }
+            )
+        }
+        composable(
+            route = Screen.AllRecords,
+            arguments = listOf(
+                navArgument("type") { type = NavType.StringType }
+            ),
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) { backStackEntry ->
+            val type = Screen.decodeRouteArg(backStackEntry.arguments?.getString("type") ?: "views")
+            val homeViewModel: HomeViewModel = viewModel()
+            val allViews by homeViewModel.allRecentViews.collectAsStateWithLifecycle()
+            val allSaves by homeViewModel.allRecentSaves.collectAsStateWithLifecycle()
+            val title = if (type == "views") "最近浏览" else "最近转存"
+            val items = if (type == "views") allViews else allSaves
+            AllRecentRecordsScreen(
+                title = title,
+                items = items,
                 onBack = { navController.popBackStack() },
                 onOpenVideo = { fileId, fileName, fileUri ->
                     navController.navigate(Screen.videoPlayer(fileId, fileName, fileUri))

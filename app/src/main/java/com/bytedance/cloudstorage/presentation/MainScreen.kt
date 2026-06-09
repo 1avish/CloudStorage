@@ -39,6 +39,8 @@ fun MainScreen(
     onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> },
     onOpenShareLink: (String) -> Unit = {},
     onOpenTransfer: () -> Unit = {},
+    onShowAllViews: () -> Unit = {},
+    onShowAllSaves: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -91,7 +93,9 @@ fun MainScreen(
             when (page) {
                 0 -> HomeScreen(
                     onOpenVideo = onOpenVideo,
-                    onOpenTxt = onOpenTxt
+                    onOpenTxt = onOpenTxt,
+                    onShowAllViews = onShowAllViews,
+                    onShowAllSaves = onShowAllSaves,
                 )
                 1 -> FileListScreen(
                     viewModel = fileListViewModel,

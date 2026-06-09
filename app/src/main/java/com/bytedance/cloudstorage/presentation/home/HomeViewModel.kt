@@ -44,6 +44,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _recentSaves = MutableStateFlow<List<RecentFileWithFolderInfo>>(emptyList())
     val recentSaves: StateFlow<List<RecentFileWithFolderInfo>> = _recentSaves.asStateFlow()
 
+    private val _allRecentViews = MutableStateFlow<List<RecentFileWithFolderInfo>>(emptyList())
+    val allRecentViews: StateFlow<List<RecentFileWithFolderInfo>> = _allRecentViews.asStateFlow()
+
+    private val _allRecentSaves = MutableStateFlow<List<RecentFileWithFolderInfo>>(emptyList())
+    val allRecentSaves: StateFlow<List<RecentFileWithFolderInfo>> = _allRecentSaves.asStateFlow()
+
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -83,6 +89,16 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 launch {
                     repository.observeRecentSavedWithFolderInfo().collect { items ->
                         _recentSaves.value = items
+                    }
+                }
+                launch {
+                    repository.observeAllRecentOpenedWithFolderInfo().collect { items ->
+                        _allRecentViews.value = items
+                    }
+                }
+                launch {
+                    repository.observeAllRecentSavedWithFolderInfo().collect { items ->
+                        _allRecentSaves.value = items
                     }
                 }
             } catch (_: Exception) {
