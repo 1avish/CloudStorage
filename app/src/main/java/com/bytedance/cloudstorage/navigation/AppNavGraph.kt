@@ -165,7 +165,10 @@ fun AppNavGraph(
                 fileId = id,
                 fileName = name,
                 fileUri = uri,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenShareLink = { token ->
+                    navController.navigate(Screen.shareList(token))
+                }
             )
         }
         composable(

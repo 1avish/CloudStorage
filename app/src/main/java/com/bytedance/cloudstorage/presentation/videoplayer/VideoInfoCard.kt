@@ -1,21 +1,27 @@
 package com.bytedance.cloudstorage.presentation.videoplayer
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -25,46 +31,78 @@ import com.bytedance.cloudstorage.presentation.filelist.formatTimestamp
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 
-// ── 视频信息卡片（标题、时间、大小、格式）
-
 @Composable
 internal fun VideoInfoCard(
     title: String,
     updatedAt: Long,
     size: Long,
+    onDownload: () -> Unit,
+    onShare: () -> Unit,
 ) {
     Column(
         modifier = Modifier
-            .padding(horizontal = 12.w.dp)
-            .shadow(4.w.dp, RoundedCornerShape(16.w.dp))
-            .clip(RoundedCornerShape(16.w.dp))
-            .background(Color.White)
-            .padding(16.w.dp)
+            .fillMaxWidth()
+            .background(PageBg)
+            .padding(horizontal = 18.w.dp)
+            .padding(top = 28.w.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.w.dp), verticalAlignment = Alignment.Top) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    title,
-                    fontSize = 15.ws.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    lineHeight = 21.ws.sp,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(8.w.dp))
-                Text("修改时间：${formatTimestamp(updatedAt)}", fontSize = 12.ws.sp, color = TextSecondary)
-                Spacer(modifier = Modifier.height(4.w.dp))
-                Text("文件大小：${formatFileSize(size)}", fontSize = 12.ws.sp, color = TextSecondary)
-            }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.w.dp))
-                    .background(BlueSoft)
-                    .padding(horizontal = 8.w.dp, vertical = 4.w.dp)
-            ) {
-                Text("MP4", fontSize = 11.ws.sp, fontWeight = FontWeight.Medium, color = ProgressBlue)
-            }
+        Text(
+            title,
+            fontSize = 18.ws.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextPrimary,
+            lineHeight = 24.ws.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(14.w.dp))
+        Text(
+            "${formatTimestamp(updatedAt)} | ${formatFileSize(size)}",
+            fontSize = 16.ws.sp,
+            color = TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Spacer(modifier = Modifier.height(24.w.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(14.w.dp)
+        ) {
+            VideoActionButton(
+                label = "下载",
+                icon = Icons.Filled.ArrowDownward,
+                onClick = onDownload,
+                modifier = Modifier.weight(1f)
+            )
+            VideoActionButton(
+                label = "分享",
+                icon = Icons.Filled.Share,
+                onClick = onShare,
+                modifier = Modifier.weight(1f)
+            )
         }
+    }
+}
+
+@Composable
+private fun VideoActionButton(
+    label: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .height(50.w.dp)
+            .clip(RoundedCornerShape(18.w.dp))
+            .background(Color(0xFF151515))
+            .clickable { onClick() }
+            .padding(horizontal = 18.w.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, label, tint = TextPrimary, modifier = Modifier.size(26.w.dp))
+        Spacer(modifier = Modifier.size(13.w.dp))
+        Text(label, fontSize = 18.ws.sp, fontWeight = FontWeight.Medium, color = TextPrimary)
     }
 }

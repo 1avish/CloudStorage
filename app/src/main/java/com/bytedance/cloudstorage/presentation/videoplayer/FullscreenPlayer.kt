@@ -20,12 +20,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -46,16 +44,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
+@UnstableApi
 @Composable
 fun FullscreenPlayer(
     onBack: () -> Unit,
     viewModel: VideoPlayerViewModel
 ) {
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val durationMs by viewModel.duration.collectAsStateWithLifecycle()
     val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle()
     val isPlayerReady by viewModel.isPlayerReady.collectAsStateWithLifecycle()
@@ -63,10 +62,9 @@ fun FullscreenPlayer(
     val player = viewModel.exoPlayer
 
     var showControls by remember { mutableStateOf(true) }
-    var showSpeedMenu by remember { mutableStateOf(false) }
 
-    LaunchedEffect(showControls, showSpeedMenu) {
-        if (showControls && !showSpeedMenu) {
+    LaunchedEffect(showControls) {
+        if (showControls) {
             delay(2500)
             showControls = false
         }
@@ -83,73 +81,17 @@ fun FullscreenPlayer(
                 )
             }
     ) {
-        if (isPlayerReady && player != null) {
-            AndroidView(
-                factory = { ctx ->
-                    PlayerView(ctx).apply {
-                        this.player = player
-                        useController = false
-                        controllerAutoShow = false
-                        controllerHideOnTouch = false
-                        hideController()
-                        layoutParams = FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                    }
-                },
-                update = { view ->
-                    view.useController = false
-                    view.controllerAutoShow = false
-                    view.controllerHideOnTouch = false
-                    if (view.player !== player) {
-                        view.player = player
-                    }
-                    view.hideController()
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        } else if (playbackError) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("视频加载失败", fontSize = 15.sp, color = Color.White.copy(alpha = 0.65f))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White.copy(alpha = 0.15f))
-                            .clickable { viewModel.retryPlay() }
-                            .padding(horizontal = 24.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Refresh, "重试", tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("重试", fontSize = 14.sp, color = Color.White)
-                        }
-                    }
-                }
-            }
+        when {
+            isPlayerReady && player != null -> FullscreenVideoSurface(player = player)
+            playbackError -> FullscreenError(onRetry = { viewModel.retryPlay() })
         }
 
-        if (showControls || showSpeedMenu) {
+        if (showControls) {
             FullscreenTopControls(onBack = onBack)
             FullscreenBottomControls(
                 isPlaying = isPlaying,
-                playbackSpeed = playbackSpeed,
                 durationMs = durationMs,
                 currentPosition = currentPosition,
-                showSpeedMenu = showSpeedMenu,
-                onShowSpeedMenu = { showSpeedMenu = true },
-                onDismissSpeedMenu = { showSpeedMenu = false },
-                onSpeedSelected = { speed ->
-                    showSpeedMenu = false
-                    showControls = true
-                    viewModel.setPlaybackSpeed(speed)
-                },
                 onTogglePlay = {
                     showControls = true
                     viewModel.togglePlayPause()
@@ -158,8 +100,63 @@ fun FullscreenPlayer(
                     showControls = true
                     viewModel.seekTo(it)
                 },
+                onExitFullscreen = onBack,
                 viewModel = viewModel
             )
+        }
+    }
+}
+
+@Composable
+private fun FullscreenVideoSurface(player: androidx.media3.exoplayer.ExoPlayer) {
+    AndroidView(
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                this.player = player
+                useController = false
+                controllerAutoShow = false
+                controllerHideOnTouch = false
+                hideController()
+                layoutParams = FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            }
+        },
+        update = { view ->
+            view.useController = false
+            view.controllerAutoShow = false
+            view.controllerHideOnTouch = false
+            if (view.player !== player) {
+                view.player = player
+            }
+            view.hideController()
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+@Composable
+private fun FullscreenError(onRetry: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("视频加载失败", fontSize = 15.sp, color = Color.White.copy(alpha = 0.65f))
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White.copy(alpha = 0.15f))
+                    .clickable { onRetry() }
+                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Refresh, "重试", tint = Color.White, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("重试", fontSize = 14.sp, color = Color.White)
+            }
         }
     }
 }
@@ -193,15 +190,11 @@ private fun BoxScope.FullscreenTopControls(onBack: () -> Unit) {
 @Composable
 private fun BoxScope.FullscreenBottomControls(
     isPlaying: Boolean,
-    playbackSpeed: Float,
     durationMs: Long,
     currentPosition: Long,
-    showSpeedMenu: Boolean,
-    onShowSpeedMenu: () -> Unit,
-    onDismissSpeedMenu: () -> Unit,
-    onSpeedSelected: (Float) -> Unit,
     onTogglePlay: () -> Unit,
     onSeek: (Float) -> Unit,
+    onExitFullscreen: () -> Unit,
     viewModel: VideoPlayerViewModel
 ) {
     Box(
@@ -232,18 +225,16 @@ private fun BoxScope.FullscreenBottomControls(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                PlayPauseButton(
-                    isPlaying = isPlaying,
-                    onTogglePlay = onTogglePlay
-                )
+                PlayPauseButton(isPlaying = isPlaying, onTogglePlay = onTogglePlay)
 
-                SpeedSelector(
-                    playbackSpeed = playbackSpeed,
-                    expanded = showSpeedMenu,
-                    onShow = onShowSpeedMenu,
-                    onDismiss = onDismissSpeedMenu,
-                    onSpeedSelected = onSpeedSelected
-                )
+                IconButton(onClick = onExitFullscreen, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        Icons.Filled.FullscreenExit,
+                        "退出全屏",
+                        tint = Color.White,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
             }
         }
     }
@@ -304,56 +295,3 @@ private fun PlayPauseButton(
         )
     }
 }
-
-@Composable
-private fun SpeedSelector(
-    playbackSpeed: Float,
-    expanded: Boolean,
-    onShow: () -> Unit,
-    onDismiss: () -> Unit,
-    onSpeedSelected: (Float) -> Unit
-) {
-    Box {
-        Row(
-            modifier = Modifier
-                .clickable { onShow() }
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                formatSpeed(playbackSpeed),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Icon(
-                Icons.Filled.KeyboardArrowDown,
-                "选择倍速",
-                tint = Color.White.copy(alpha = 0.82f),
-                modifier = Modifier.size(18.dp)
-            )
-        }
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = onDismiss,
-            containerColor = Color.White,
-            shape = RoundedCornerShape(14.dp)
-        ) {
-            PlaybackSpeeds.forEach { speed ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            formatSpeed(speed),
-                            fontSize = 13.sp,
-                            fontWeight = if (speed == playbackSpeed) FontWeight.Bold else FontWeight.Normal,
-                            color = if (speed == playbackSpeed) ProgressBlue else TextPrimary
-                        )
-                    },
-                    onClick = { onSpeedSelected(speed) }
-                )
-            }
-        }
-    }
-}
-

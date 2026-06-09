@@ -15,6 +15,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.bytedance.cloudstorage.data.local.database.AppDatabase
 import com.bytedance.cloudstorage.data.remote.datasource.MockFileRemoteDataSource
 import com.bytedance.cloudstorage.data.repository.FileRepository
+import com.bytedance.cloudstorage.data.share.CreatedShareLink
+import com.bytedance.cloudstorage.data.share.ShareLinkHandledAction
+import com.bytedance.cloudstorage.data.share.ShareLinkStore
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -51,6 +54,7 @@ data class Episode(
     val size: Long = 0L,
     val updatedAt: Long = 0L,
     val coverUri: String? = null,
+    val lastOpenedAt: Long? = null,
 )
 
 /**
@@ -94,9 +98,13 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private val _toastMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
     val toastMessage: SharedFlow<String> = _toastMessage
 
+    private val _createdShareLink = MutableSharedFlow<CreatedShareLink?>(extraBufferCapacity = 1)
+    val createdShareLink: SharedFlow<CreatedShareLink?> = _createdShareLink
+
     private var initialized = false
     private var fileId: String = ""
     private var episodeJob: Job? = null
+    private val shareLinkStore = ShareLinkStore(application)
     private val db = AppDatabase.getInstance(application)
     private val repository = FileRepository(
         fileDao = db.fileDao(),
@@ -133,6 +141,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                         size = file.size,
                         updatedAt = file.updatedAt,
                         coverUri = file.coverUri,
+                        lastOpenedAt = file.lastOpenedAt,
                     )
                 }
                 _episodes.value = episodes
@@ -328,5 +337,25 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch { withContext(Dispatchers.IO) {
             repository.markFileOpened(id)
         } }
+    }
+
+    fun createShareLink() {
+        val id = _activeEpisode.value.id.ifEmpty { fileId }
+        if (id.isEmpty()) {
+            viewModelScope.launch { _createdShareLink.emit(null) }
+            return
+        }
+
+        viewModelScope.launch {
+            val link = shareLinkStore.createShare(listOf(id))
+            shareLinkStore.copyToClipboard(link)
+            _createdShareLink.emit(link)
+        }
+    }
+
+    fun markShareLinkHandled(token: String, action: ShareLinkHandledAction) {
+        viewModelScope.launch {
+            shareLinkStore.markHandled(token, action)
+        }
     }
 }
