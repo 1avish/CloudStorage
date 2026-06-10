@@ -42,6 +42,13 @@ import com.bytedance.cloudstorage.utils.ws
 // 底部弹窗：重命名
 // ────────────────────────────────────────────────
 
+/**
+ * 重命名底部弹窗，打开时自动聚焦输入框并填入当前文件名。
+ *
+ * @param currentName 当前文件名（作为初始值）
+ * @param onDismiss   取消/关闭回调
+ * @param onConfirm   确认重命名回调，参数为新文件名
+ */
 @Composable
 internal fun VideoRenameSheet(
     currentName: String,

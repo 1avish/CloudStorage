@@ -53,6 +53,30 @@ import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 import kotlinx.coroutines.delay
 
+// ────────────────────────────────────────────────
+// 播放器卡片（视频画面 + 控制栏）
+// ────────────────────────────────────────────────
+
+/**
+ * 视频播放卡片，包含视频画面、顶部导航/下载/分享遮罩、底部进度条与播放控制栏。
+ *
+ * 点击画面切换控制栏显隐，双击切换播放/暂停；控制栏显�后 2.6s 自动隐藏。
+ *
+ * @param fileUri        视频播放地址
+ * @param isPlayerReady  ExoPlayer 是否已进入可播放状态
+ * @param isPlaying      是否正在播放
+ * @param durationMs     视频总时长（毫秒）
+ * @param currentPosition 当前播放进度（毫秒）
+ * @param playbackError  是否播放失败
+ * @param onTogglePlay   播放/暂停切换回调
+ * @param onSeek         跳转进度回调（0f–1f 百分比）
+ * @param onBack         返回按钮回调
+ * @param onDownload     下载按钮回调
+ * @param onShare        分享按钮回调
+ * @param onFullscreen   全屏按钮回调
+ * @param onRetry        播放失败重试回调
+ * @param viewModel      播放器 ViewModel
+ */
 @UnstableApi
 @Composable
 internal fun PlayerCard(

@@ -48,6 +48,18 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 
+// ────────────────────────────────────────────────
+// 全屏播放器
+// ────────────────────────────────────────────────
+
+/**
+ * 全屏视频播放器，横屏展示视频画面及播放控制栏。
+ *
+ * 控制栏显隐行为与竖屏卡片一致：点击切换，2.5s 无操作自动隐藏。
+ *
+ * @param onBack    退出全屏回调
+ * @param viewModel 播放器 ViewModel
+ */
 @UnstableApi
 @Composable
 fun FullscreenPlayer(

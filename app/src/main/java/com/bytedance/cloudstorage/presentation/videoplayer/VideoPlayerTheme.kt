@@ -12,10 +12,15 @@ internal val PlayerBg = Color(0xFF000000)
 internal val ProgressBlue = Color(0xFF1677FF)
 /** 页面背景色 */
 internal val PageBg = Color(0xFF000000)
+/** 标题文字色 */
 internal val TextPrimary = Color(0xFFFFFFFF)
+/** 次要文字色 */
 internal val TextSecondary = Color(0xFF9A9A9A)
+/** 边框/分隔线色 */
 internal val BorderGray = Color(0xFFE5E6EB)
+/** 播放/控制按钮白色 */
 internal val ControlWhite = Color.White
+/** 浅蓝色辅助背景 */
 internal val BlueSoft = Color(0xFFE8F2FF)
 /** 底部弹窗背景色 */
 internal val SheetBg = Color(0xFFF5F7FA)

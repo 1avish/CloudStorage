@@ -31,6 +31,13 @@ import com.bytedance.cloudstorage.presentation.share.ShareLinkPromptDialog
 import com.bytedance.cloudstorage.utils.w
 import kotlinx.coroutines.delay
 
+// ────────────────────────────────────────────────
+// 视频播放主页面
+// ────────────────────────────────────────────────
+
+/**
+ * 将毫秒格式化为 mm:ss 时间字符串。
+ */
 fun formatTime(ms: Long): String {
     val seconds = (ms / 1000).coerceAtLeast(0)
     val minutes = seconds / 60
@@ -38,6 +45,19 @@ fun formatTime(ms: Long): String {
     return "%02d:%02d".format(minutes, remainSeconds)
 }
 
+/**
+ * 视频播放主页面，展示播放器卡片、视频信息、选集列表，并支持全屏切换。
+ *
+ * 通过 [VideoPlayerViewModel] 管理播放状态、进度、选集切换、分享链接等业务逻辑。
+ * 页面退出时自动恢复竖屏并显示系统状态栏。
+ *
+ * @param fileId         当前视频文件 ID
+ * @param fileName       文件显示名称
+ * @param fileUri        视频播放地址
+ * @param onBack         返回上一页回调
+ * @param onOpenShareLink 打开分享链接的回调
+ * @param viewModel      播放器 ViewModel
+ */
 @UnstableApi
 @Composable
 fun VideoPlayerScreen(

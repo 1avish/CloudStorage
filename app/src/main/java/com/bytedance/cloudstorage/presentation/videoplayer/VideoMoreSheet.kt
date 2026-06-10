@@ -35,6 +35,14 @@ import com.bytedance.cloudstorage.utils.ws
 // 更多操作 Bottom Sheet
 // ────────────────────────────────────────────────
 
+/**
+ * 更多操作底部弹窗，提供下载、分享、重命名、删除四项操作入口。
+ *
+ * @param onDownload 下载按钮回调
+ * @param onShare    分享按钮回调
+ * @param onRename   重命名按钮回调
+ * @param onDelete   删除按钮回调
+ */
 @Composable
 internal fun VideoMoreSheet(
     onDownload: () -> Unit,
@@ -121,6 +129,14 @@ internal fun VideoMoreSheet(
 // 更多操作：单个操作按钮
 // ────────────────────────────────────────────────
 
+/**
+ * 更多操作弹窗中的单个操作按钮，包含彩色圆形图标和文字标签。
+ *
+ * @param label     按钮文字
+ * @param icon      图标
+ * @param iconColor 图标颜色
+ * @param onClick   点击回调
+ */
 @Composable
 private fun MoreSheetAction(
     label: String,

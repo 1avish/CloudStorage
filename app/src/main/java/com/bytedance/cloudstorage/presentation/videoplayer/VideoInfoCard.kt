@@ -31,6 +31,19 @@ import com.bytedance.cloudstorage.presentation.filelist.formatTimestamp
 import com.bytedance.cloudstorage.utils.w
 import com.bytedance.cloudstorage.utils.ws
 
+// ────────────────────────────────────────────────
+// 视频信息卡片（标题 + 大小/时间 + 操作按钮）
+// ────────────────────────────────────────────────
+
+/**
+ * 视频信息卡片，展示当前视频的标题、更新时间、文件大小，以及下载/分享操作按钮。
+ *
+ * @param title     视频标题
+ * @param updatedAt 更新时间戳（毫秒）
+ * @param size      文件大小（字节）
+ * @param onDownload 下载按钮回调
+ * @param onShare    分享按钮回调
+ */
 @Composable
 internal fun VideoInfoCard(
     title: String,
