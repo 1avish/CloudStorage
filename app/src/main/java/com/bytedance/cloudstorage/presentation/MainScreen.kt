@@ -178,10 +178,10 @@ fun MainScreen(
                         .offset(x = (-36).w.dp, y = (-62).w.dp)
                         .size(56.w.dp)
                         .shadow(
-                            elevation = 18.dp,
+                            elevation = 6.dp,
                             shape = CircleShape,
-                            ambientColor = Color.Black.copy(alpha = 0.16f),
-                            spotColor = Color.Black.copy(alpha = 0.18f)
+                            ambientColor = Color.Black.copy(alpha = 0.5f),
+                            spotColor = Color.Black.copy(alpha = 0.5f)
                         )
                         .clip(CircleShape)
                         .background(Color.White)
