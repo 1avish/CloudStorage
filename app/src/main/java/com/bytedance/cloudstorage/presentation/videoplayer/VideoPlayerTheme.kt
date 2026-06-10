@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.Color
 /** 播放器背景色 */
 internal val PlayerBg = Color(0xFF000000)
 /** 进度条/按钮主色 */
-internal val ProgressBlue = Color(0xFF1677FF)
+internal val ProgressBlue = Color(0xFFFFE36A)
 /** 页面背景色 */
 internal val PageBg = Color(0xFF000000)
 /** 标题文字色 */
@@ -20,8 +20,8 @@ internal val TextSecondary = Color(0xFF9A9A9A)
 internal val BorderGray = Color(0xFFE5E6EB)
 /** 播放/控制按钮白色 */
 internal val ControlWhite = Color.White
-/** 浅蓝色辅助背景 */
-internal val BlueSoft = Color(0xFFE8F2FF)
+/** 浅黄色辅助背景 */
+internal val BlueSoft = Color(0xFFFFF8D8)
 /** 底部弹窗背景色 */
 internal val SheetBg = Color(0xFFF5F7FA)
 /** 倍速选项列表 */

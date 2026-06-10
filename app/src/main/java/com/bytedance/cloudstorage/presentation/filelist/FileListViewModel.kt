@@ -146,6 +146,18 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
     private val _moveTargetFolders = MutableStateFlow<List<CloudFile>>(emptyList())
     val moveTargetFolders: StateFlow<List<CloudFile>> = _moveTargetFolders.asStateFlow()
 
+    // ── 上传保存位置选择 ──
+    private val _showUploadTargetSheet = MutableStateFlow(false)
+    val showUploadTargetSheet: StateFlow<Boolean> = _showUploadTargetSheet.asStateFlow()
+    private val _uploadTargetFolderId = MutableStateFlow<String?>(null)
+    val uploadTargetFolderId: StateFlow<String?> = _uploadTargetFolderId.asStateFlow()
+    private val _uploadTargetPathStack = MutableStateFlow<List<String>>(emptyList())
+    val uploadTargetPathStack: StateFlow<List<String>> = _uploadTargetPathStack.asStateFlow()
+    private val _uploadTargetFolders = MutableStateFlow<List<CloudFile>>(emptyList())
+    val uploadTargetFolders: StateFlow<List<CloudFile>> = _uploadTargetFolders.asStateFlow()
+    private val _uploadTargetFiles = MutableStateFlow<List<CloudFile>>(emptyList())
+    val uploadTargetFiles: StateFlow<List<CloudFile>> = _uploadTargetFiles.asStateFlow()
+
     init {
         viewModelScope.launch {
             repository.initializeDataIfEmpty()
@@ -188,7 +200,14 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
      * @param uri  content:// URI 字符串
      * @param type 文件类型键："video" / "txt" / "other"
      */
-    fun uploadFile(name: String, size: Long, uri: String, coverUri: String?, type: String) {
+    fun uploadFile(
+        name: String,
+        size: Long,
+        uri: String,
+        coverUri: String?,
+        type: String,
+        parentId: String? = _currentFolderId.value,
+    ) {
         viewModelScope.launch {
             try {
                 repository.uploadFile(
@@ -197,7 +216,7 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
                     uri = uri,
                     coverUri = coverUri,
                     type = type,
-                    parentId = _currentFolderId.value,
+                    parentId = parentId,
                 )
             } catch (_: Exception) {
                 _toastMessage.tryEmit("上传失败")
@@ -438,6 +457,63 @@ class FileListViewModel(application: Application) : AndroidViewModel(application
             } catch (_: Exception) {
                 _toastMessage.tryEmit("移动失败")
             }
+        }
+    }
+
+    fun openUploadTargetSheet() {
+        _showUploadTargetSheet.value = true
+        _uploadTargetFolderId.value = null
+        _uploadTargetPathStack.value = emptyList()
+        loadUploadTargetFolders(null)
+    }
+
+    fun closeUploadTargetSheet() {
+        _showUploadTargetSheet.value = false
+    }
+
+    fun reopenUploadTargetSheet() {
+        _showUploadTargetSheet.value = true
+        loadUploadTargetFolders(_uploadTargetFolderId.value)
+    }
+
+    fun navigateUploadIntoFolder(folderId: String, folderName: String) {
+        _uploadTargetPathStack.value = _uploadTargetPathStack.value + folderName
+        _uploadTargetFolderId.value = folderId
+        loadUploadTargetFolders(folderId)
+    }
+
+    fun navigateUploadBack() {
+        val stack = _uploadTargetPathStack.value
+        if (stack.isEmpty()) return
+        navigateUploadToPathIndex(stack.size - 1)
+    }
+
+    fun navigateUploadToPathIndex(index: Int) {
+        val stack = _uploadTargetPathStack.value
+        if (index > stack.size) return
+        val newStack = stack.take(index)
+        _uploadTargetPathStack.value = newStack
+        viewModelScope.launch {
+            val newParentId = if (newStack.isEmpty()) null else findFolderIdByPath(newStack)
+            _uploadTargetFolderId.value = newParentId
+            loadUploadTargetFolders(newParentId)
+        }
+    }
+
+    private fun loadUploadTargetFolders(parentId: String?) {
+        viewModelScope.launch {
+            val targetFiles = repository.getFilesByParent(parentId)
+            _uploadTargetFiles.value = targetFiles
+            _uploadTargetFolders.value = targetFiles.filter { it.type == FileType.Folder }
+        }
+    }
+
+    fun createFolderInUploadTarget(name: String) {
+        viewModelScope.launch {
+            val targetId = _uploadTargetFolderId.value
+            val existingNames = repository.getFilesByParent(targetId).map { it.name }.toSet()
+            repository.createFolder(generateUniqueName(name, existingNames), targetId)
+            loadUploadTargetFolders(targetId)
         }
     }
 

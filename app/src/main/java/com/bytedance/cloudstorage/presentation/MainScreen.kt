@@ -1,6 +1,7 @@
 package com.bytedance.cloudstorage.presentation
 
 import android.widget.Toast
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -45,6 +46,7 @@ import com.bytedance.cloudstorage.presentation.common.TextInputBottomSheet
 import com.bytedance.cloudstorage.presentation.filelist.BottomSheetContent
 import com.bytedance.cloudstorage.presentation.filelist.FileListScreen
 import com.bytedance.cloudstorage.presentation.filelist.FileListViewModel
+import com.bytedance.cloudstorage.presentation.filelist.SaveLocationPickerSheet
 import com.bytedance.cloudstorage.presentation.filelist.generateUniqueName
 import com.bytedance.cloudstorage.presentation.filelist.uploadSelectedFile
 import com.bytedance.cloudstorage.presentation.home.HomeScreen
@@ -77,11 +79,18 @@ fun MainScreen(
     var showCreateSheet by androidx.compose.runtime.remember { mutableStateOf(false) }
     var showSaveShareSheet by androidx.compose.runtime.remember { mutableStateOf(false) }
     var showNewFolderSheet by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var showUploadNewFolderSheet by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var pendingUploadUri by androidx.compose.runtime.remember { mutableStateOf<Uri?>(null) }
     val createSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val pagerState = rememberPagerState(pageCount = { 2 })
 
     val files by fileListViewModel.files.collectAsStateWithLifecycle()
+    val showUploadTargetSheet by fileListViewModel.showUploadTargetSheet.collectAsStateWithLifecycle()
+    val uploadTargetFolderId by fileListViewModel.uploadTargetFolderId.collectAsStateWithLifecycle()
+    val uploadTargetPathStack by fileListViewModel.uploadTargetPathStack.collectAsStateWithLifecycle()
+    val uploadTargetFolders by fileListViewModel.uploadTargetFolders.collectAsStateWithLifecycle()
+    val uploadTargetFiles by fileListViewModel.uploadTargetFiles.collectAsStateWithLifecycle()
     val hasBack by fileListViewModel.hasBack.collectAsStateWithLifecycle()
     val pathStack by fileListViewModel.pathStack.collectAsStateWithLifecycle()
     val currentFolderName by fileListViewModel.currentFolderName.collectAsStateWithLifecycle()
@@ -91,7 +100,8 @@ fun MainScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        uploadSelectedFile(context, uri, fileListViewModel, files)
+        pendingUploadUri = uri
+        fileListViewModel.openUploadTargetSheet()
     }
 
     LaunchedEffect(fileListViewModel) {
@@ -254,6 +264,75 @@ fun MainScreen(
                     val uniqueName = generateUniqueName(name, files.map { it.name }.toSet())
                     fileListViewModel.createFolder(uniqueName)
                     showNewFolderSheet = false
+                }
+            )
+        }
+    }
+
+    if (showUploadTargetSheet && pendingUploadUri != null) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                fileListViewModel.closeUploadTargetSheet()
+                pendingUploadUri = null
+            },
+            sheetState = createSheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            dragHandle = null
+        ) {
+            SaveLocationPickerSheet(
+                pathStack = uploadTargetPathStack,
+                folders = uploadTargetFolders,
+                onNavigateInto = { id, name -> fileListViewModel.navigateUploadIntoFolder(id, name) },
+                onNavigateBack = { fileListViewModel.navigateUploadBack() },
+                onPathClick = { index -> fileListViewModel.navigateUploadToPathIndex(index) },
+                onConfirmUpload = {
+                    pendingUploadUri?.let { uri ->
+                        uploadSelectedFile(
+                            context = context,
+                            uri = uri,
+                            viewModel = fileListViewModel,
+                            existingFiles = uploadTargetFiles,
+                            parentId = uploadTargetFolderId,
+                        )
+                    }
+                    pendingUploadUri = null
+                    fileListViewModel.closeUploadTargetSheet()
+                },
+                onDismiss = {
+                    pendingUploadUri = null
+                    fileListViewModel.closeUploadTargetSheet()
+                },
+                onNewFolder = {
+                    fileListViewModel.closeUploadTargetSheet()
+                    showUploadNewFolderSheet = true
+                },
+            )
+        }
+    }
+
+    if (showUploadNewFolderSheet) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showUploadNewFolderSheet = false
+                fileListViewModel.reopenUploadTargetSheet()
+            },
+            sheetState = createSheetState,
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+            dragHandle = null
+        ) {
+            TextInputBottomSheet(
+                title = "新建文件夹",
+                placeholder = "请输入文件夹名",
+                onDismiss = {
+                    showUploadNewFolderSheet = false
+                    fileListViewModel.reopenUploadTargetSheet()
+                },
+                onConfirm = { name ->
+                    fileListViewModel.createFolderInUploadTarget(name)
+                    showUploadNewFolderSheet = false
+                    fileListViewModel.reopenUploadTargetSheet()
                 }
             )
         }

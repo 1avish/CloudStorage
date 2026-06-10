@@ -194,8 +194,8 @@ internal fun MoveFolderPickerSheet(
             )
             MovePickerButton(
                 text = "保存到此处",
-                textColor = Color.White,
-                background = Color(0xFF3370FF),
+                textColor = TextPrimary,
+                background = PrimaryBlue,
                 modifier = Modifier.weight(1f),
                 onClick = onConfirmMove
             )
@@ -317,8 +317,145 @@ private fun MovePickerButton(
         Text(
             text = text,
             fontSize = 16.ws.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.W700,
             color = textColor
         )
+    }
+}
+
+@Composable
+internal fun SaveLocationPickerSheet(
+    pathStack: List<String>,
+    folders: List<CloudFile>,
+    onNavigateInto: (String, String) -> Unit,
+    onNavigateBack: () -> Unit,
+    onPathClick: (Int) -> Unit,
+    onConfirmUpload: () -> Unit,
+    onDismiss: () -> Unit,
+    onNewFolder: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.62f)
+            .background(Color.White)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.w.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.w.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (pathStack.isNotEmpty()) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    tint = TextPrimary,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .size(28.w.dp)
+                        .clickable { onNavigateBack() }
+                        .padding(3.w.dp)
+                )
+            }
+            Text(
+                text = "选择保存位置",
+                fontSize = 20.ws.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "关闭",
+                tint = TextPrimary,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .size(32.w.dp)
+                    .clickable { onDismiss() }
+                    .padding(2.w.dp)
+            )
+        }
+
+        SaveLocationPathBar(
+            pathStack = pathStack,
+            onPathClick = onPathClick
+        )
+
+        Spacer(modifier = Modifier.height(12.w.dp))
+
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.w.dp)
+        ) {
+            items(folders, key = { it.id }) { folder ->
+                MoveFolderRow(
+                    folder = folder,
+                    onClick = { onNavigateInto(folder.id, folder.name) }
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.w.dp, bottom = 12.w.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.w.dp)
+        ) {
+            MovePickerButton(
+                text = "新建文件夹",
+                textColor = TextPrimary,
+                background = Color(0xFFF0F0F0),
+                modifier = Modifier.weight(1f),
+                onClick = onNewFolder
+            )
+            MovePickerButton(
+                text = "确认上传到此处",
+                textColor = TextPrimary,
+                background = PrimaryBlue,
+                modifier = Modifier.weight(1f),
+                onClick = onConfirmUpload
+            )
+        }
+    }
+}
+
+@Composable
+private fun SaveLocationPathBar(
+    pathStack: List<String>,
+    onPathClick: (Int) -> Unit,
+) {
+    val fullPath = listOf("我的网盘") + pathStack
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(44.w.dp)
+            .clip(RoundedCornerShape(24.w.dp))
+            .background(Color(0xFFF3F3F3))
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 18.w.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        fullPath.forEachIndexed { index, name ->
+            if (index > 0) {
+                Text(
+                    text = " / ",
+                    fontSize = 16.ws.sp,
+                    color = MoveBreadcrumbDivider
+                )
+            }
+            val isCurrent = index == fullPath.lastIndex
+            Text(
+                text = name,
+                fontSize = 16.ws.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isCurrent) TextPrimary else MoveBreadcrumbGray,
+                maxLines = 1,
+                modifier = if (isCurrent) Modifier else Modifier.clickable { onPathClick(index) }
+            )
+        }
     }
 }

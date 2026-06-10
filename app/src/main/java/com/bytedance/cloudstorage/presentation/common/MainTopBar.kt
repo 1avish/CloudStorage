@@ -282,7 +282,7 @@ private fun TabItem(
                     .offset(y = 4.dp)
                     .size(width = 40.dp, height = 2.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF2979FF))
+                    .background(Color(0xFFFFE36A))
             )
         }
     }

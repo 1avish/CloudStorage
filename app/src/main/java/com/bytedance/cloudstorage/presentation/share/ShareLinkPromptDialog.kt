@@ -105,7 +105,7 @@ fun ShareLinkPromptDialog(
                         text = "立即查看",
                         fontSize = 22.ws.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = TextPrimary
                     )
                 }
                 Spacer(modifier = Modifier.height(16.w.dp))

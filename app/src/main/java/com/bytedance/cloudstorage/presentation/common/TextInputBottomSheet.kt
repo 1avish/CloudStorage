@@ -198,8 +198,8 @@ internal fun TextInputBottomSheet(
                     text = "确认",
                     fontSize = 16.ws.sp,
                     fontWeight = FontWeight.Medium,
-                    color = if (inputValue.isNotBlank()) Color.White
-                    else Color.White.copy(alpha = 0.5f)
+                    color = if (inputValue.isNotBlank()) TextPrimary
+                    else TextPrimary.copy(alpha = 0.45f)
                 )
             }
         }
