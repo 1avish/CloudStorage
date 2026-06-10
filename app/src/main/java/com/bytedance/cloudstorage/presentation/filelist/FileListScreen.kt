@@ -193,7 +193,10 @@ fun FileListScreen(
             } else {
                 // lastFileId 在 items 块外计算，避免 lambda 捕获 files 列表
                 val lastFileId = files.last().id
-                key(selectedFilterIndex, sortType, sortDirection) {
+                val fileOrderKey = remember(files) {
+                    files.joinToString(separator = "|") { it.id }
+                }
+                key(selectedFilterIndex, sortType, sortDirection, fileOrderKey) {
                     val listState = rememberLazyListState()
                     LazyColumn(
                         state = listState,
@@ -207,7 +210,6 @@ fun FileListScreen(
                     ) {
                         items(
                             items = files,
-                            key = { it.id },
                             contentType = { it.type.name }
                         ) { file ->
                             FileListItem(
