@@ -70,7 +70,7 @@ import java.util.concurrent.TimeUnit
 // 颜色常量，与设计稿对齐
 // ────────────────────────────────────────────────
 private val BgGray         = Color(0xFFF5F6F8)
-private val ProgressBlue   = Color(0xFF2979FF)
+private val ProgressBlue   = Color(0xFFFFE36A)
 private val ProgressYellow = Color(0xFFFAAD14)
 private val ProgressRed    = Color(0xFFFF4D4F)
 private val TextPrimary    = Color(0xFF1D2129)
@@ -169,6 +169,12 @@ fun HomeScreen(
 // 加载失败重试组件
 // ────────────────────────────────────────────────
 
+/**
+ * 加载失败占位组件，展示错误图标、错误信息和重试按钮。
+ *
+ * @param message 错误提示文字
+ * @param onRetry 点击重试回调
+ */
 @Composable
 private fun ErrorRetryContent(
     message: String,
@@ -207,7 +213,7 @@ private fun ErrorRetryContent(
                     text = "重试",
                     fontSize = 15.ws.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.White,
+                    color = TextPrimary,
                 )
             }
         }
@@ -250,7 +256,7 @@ private fun PersonalSpaceCard(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(Color(0xFF4A90FF), Color(0xFF2979FF))
+                                colors = listOf(Color(0xFFFFE36A), Color(0xFFFFB85C))
                         )
                     ),
                 contentAlignment = Alignment.Center

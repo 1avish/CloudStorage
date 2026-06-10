@@ -35,6 +35,17 @@ import com.bytedance.cloudstorage.utils.ws
 // 底部弹窗：保存分享 + 新建文件夹 + 上传文件
 // ────────────────────────────────────────────────
 
+/**
+ * 创建/上传底部弹窗内容，提供视频上传、文档上传、新建文件夹、保存分享四项入口。
+ *
+ * 采用四宫格布局，每个入口为彩色圆角方块图标 + 文字标签。
+ *
+ * @param onDismiss     关闭弹窗回调
+ * @param onSaveShare   保存分享入口回调
+ * @param onNewFolder   新建文件夹入口回调
+ * @param onUploadVideo 上传视频入口回调
+ * @param onUploadDoc   上传文档入口回调
+ */
 @Composable
 internal fun BottomSheetContent(
     onDismiss: () -> Unit,
@@ -95,7 +106,7 @@ internal fun BottomSheetContent(
             Triple("视频", Icons.Default.OndemandVideo, Color(0xFF9B6CFF)),
             Triple("文档", Icons.Default.Description, Color(0xFF58D27F)),
             Triple("新建文件夹", Icons.Default.CreateNewFolder, Color(0xFF7389FF)),
-            Triple("保存分享", Icons.Default.Link, Color(0xFF4D8BFF))
+            Triple("保存分享", Icons.Default.Link, PrimaryBlue)
         )
 
         Row(
@@ -128,7 +139,7 @@ internal fun BottomSheetContent(
                         Icon(
                             imageVector = icon,
                             contentDescription = label,
-                            tint = Color.White,
+                            tint = if (iconColor == PrimaryBlue) TextPrimary else Color.White,
                             modifier = Modifier.size(31.w.dp)
                         )
                     }

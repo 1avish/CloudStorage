@@ -103,7 +103,8 @@ internal fun uploadSelectedFile(
     context: Context,
     uri: Uri,
     viewModel: FileListViewModel,
-    existingFiles: List<CloudFile>
+    existingFiles: List<CloudFile>,
+    parentId: String? = null,
 ) {
     val contentResolver = context.contentResolver
     val mimeType = contentResolver.getType(uri)
@@ -141,7 +142,8 @@ internal fun uploadSelectedFile(
         size = fileSize,
         uri = localUri.toString(),
         coverUri = coverUri,
-        type = fileType
+        type = fileType,
+        parentId = parentId,
     )
 }
 
@@ -165,6 +167,13 @@ private fun copyToAppStorage(context: Context, sourceUri: Uri, fileName: String)
     return Uri.fromFile(localFile)
 }
 
+/**
+ * 从视频文件中提取首帧作为封面图片，保存到应用私有目录 covers/。
+ *
+ * @param context  上下文
+ * @param videoUri 视频文件本地 URI
+ * @return 封面图片 URI，提取失败时返回 null
+ */
 internal fun createVideoCover(context: Context, videoUri: Uri): Uri? {
     val coverDir = File(context.filesDir, "covers")
     if (!coverDir.exists()) coverDir.mkdirs()
