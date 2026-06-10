@@ -22,6 +22,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
+/**
+ * 视频封面缩略图，支持 Coil 加载封面图片，可叠加半透明播放图标。
+ *
+ * @param coverUri      封面图片本地 URI，为 null 时仅显示深色渐变背景
+ * @param cornerRadiusDp 圆角半径（dp）
+ * @param showPlayIcon  是否叠加播放图标
+ */
 @Composable
 internal fun VideoCoverThumbnail(
     coverUri: String?,

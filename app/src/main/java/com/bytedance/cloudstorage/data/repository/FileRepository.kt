@@ -112,6 +112,38 @@ class FileRepository(
         }
 
     /**
+     * 全部最近浏览文件（无数量限制）
+     */
+    fun observeAllRecentOpenedWithFolderInfo(): Flow<List<RecentFileWithFolderInfo>> =
+        fileDao.getAllRecentOpenedFiles().map { entities ->
+            entities.map { entity ->
+                val cloudFile = FileMapper.toDomain(entity)
+                val folderInfo = entity.parentId?.let { getFolderInfo(it) }
+                RecentFileWithFolderInfo(
+                    file = cloudFile,
+                    parentName = folderInfo?.parentName ?: "根目录",
+                    hasGrandParent = folderInfo?.hasGrandParent ?: false,
+                )
+            }
+        }
+
+    /**
+     * 全部最近转存文件（无数量限制）
+     */
+    fun observeAllRecentSavedWithFolderInfo(): Flow<List<RecentFileWithFolderInfo>> =
+        fileDao.getAllRecentSavedFiles().map { entities ->
+            entities.map { entity ->
+                val cloudFile = FileMapper.toDomain(entity)
+                val folderInfo = entity.parentId?.let { getFolderInfo(it) }
+                RecentFileWithFolderInfo(
+                    file = cloudFile,
+                    parentName = folderInfo?.parentName ?: "根目录",
+                    hasGrandParent = folderInfo?.hasGrandParent ?: false,
+                )
+            }
+        }
+
+    /**
      * 查询文件夹的父级信息
      *
      * 仅在 Repository 内部使用，用于组装 RecentFileWithFolderInfo。

@@ -92,8 +92,8 @@ import kotlin.math.min
 private val ReaderSurface = Color(0xFFF6F6F6)
 private val ReaderText = Color(0xFF111827)
 private val ReaderSubText = Color(0xFF8B919E)
-private val ReaderBlue = Color(0xFF3370FF)
-private val ReaderSkyBlue = Color(0xFF40B8FF)
+private val ReaderBlue = Color(0xFFFFE36A)
+private val ReaderSkyBlue = Color(0xFFFFF4BA)
 private val ReaderPanelSurface = Color.White
 private val ReaderControlBg = Color(0xFFF3F5F8)
 private val ReaderDivider = Color(0xFFE8ECF2)
@@ -178,6 +178,17 @@ private fun formatDouble(value: Double): String = String.format(Locale.US, "%.2f
 
 // ── TXT 阅读器入口 ──
 
+/**
+ * TXT 文本阅读器主页面。
+ *
+ * 打开后自动检测文件编码，流式分页渲染文本内容，
+ * 支持翻页阅读、亮度调节、背景切换、字号/行间距设置。
+ *
+ * @param fileId   文件 ID（用于标记已打开）
+ * @param fileName 文件显示名称
+ * @param fileUri  文件 content:// URI
+ * @param onBack   返回上一页回调
+ */
 @Composable
 fun TxtReaderScreen(
     fileId: String,
@@ -197,6 +208,14 @@ fun TxtReaderScreen(
 
 // ── 顶部栏：返回按钮 + 文件名 ──
 
+/**
+ * 阅读器顶部导航栏，显示返回按钮和当前文件名。
+ *
+ * @param fileName     文件显示名称
+ * @param onBack       返回回调
+ * @param surfaceColor 顶栏背景色（跟随阅读器主题）
+ * @param contentColor 顶栏文字/图标色
+ */
 @Composable
 private fun TxtReaderTopBar(
     fileName: String,
@@ -264,6 +283,19 @@ private fun ErrorContent(message: String) {
 // 整个文件永远不会一次性读入内存。
 // 流程：文件 → BufferedReader → 按段读取 → TextMeasurer 测量 → 逐页 emit → UI 渐进渲染
 
+/**
+ * 分页阅读主体组件，实现流式分页和翻页渲染。
+ *
+ * 整个文件不会一次性读入内存，而是通过 BufferedReader 按段读取，
+ * TextMeasurer 逐段测量排版行数，每攒满一页立即 emit 给 UI 渲染，
+ * 实现低内存占用的渐进式阅读体验。
+ *
+ * @param fileKey  文件唯一标识（fileId + fileUri），用于切换文件时重置所有状态
+ * @param fileId   文件 ID
+ * @param fileName 文件显示名称
+ * @param fileUri  文件 content:// URI
+ * @param onBack   返回上一页回调
+ */
 @Composable
 private fun TxtPagerContent(
     fileKey: String,
@@ -544,6 +576,24 @@ private fun TxtPagerContent(
 // ── 阅读器设置面板：底部 Tab 栏 + 可展开的设置内容 ──
 // 结构：[设置内容行]（可选，点击 Tab 时展开/收起）
 //       [底部 Tab 栏]  亮度 | 背景 | 字体 | 行间距
+
+/**
+ * 阅读器设置叠加层，包含底部 Tab 栏和可展开的设置面板内容。
+ *
+ * @param activePanel            当前展开的设置面板，null 表示全部收起
+ * @param onActivePanelChange    切换展开面板回调
+ * @param brightness             当前亮度值（0.05–1.0）
+ * @param onBrightnessChange     亮度调节回调
+ * @param useSystemBrightness    是否跟随系统亮度
+ * @param onUseSystemBrightnessChange 切换系统亮度回调
+ * @param backgroundIndex        当前背景色下标
+ * @param onBackgroundIndexChange 切换背景色回调
+ * @param fontSizeIndex          当前字号下标
+ * @param onDecreaseFontSize     缩小字号回调
+ * @param onIncreaseFontSize     放大字号回调
+ * @param lineSpacingIndex       当前行间距下标
+ * @param onLineSpacingIndexChange 切换行间距回调
+ */
 @Composable
 private fun ReaderSettingsOverlay(
     activePanel: ReaderSettingPanel?,

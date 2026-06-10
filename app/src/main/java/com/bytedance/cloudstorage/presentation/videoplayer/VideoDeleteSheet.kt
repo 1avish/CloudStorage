@@ -31,6 +31,13 @@ import com.bytedance.cloudstorage.utils.ws
 // 底部弹窗：确认删除
 // ────────────────────────────────────────────────
 
+/**
+ * 确认删除底部弹窗，展示警告图标及文件名，点击「删除」执行删除操作。
+ *
+ * @param fileName  被删除的文件名
+ * @param onDismiss 取消/关闭回调
+ * @param onConfirm 确认删除回调
+ */
 @Composable
 internal fun VideoDeleteSheet(
     fileName: String,

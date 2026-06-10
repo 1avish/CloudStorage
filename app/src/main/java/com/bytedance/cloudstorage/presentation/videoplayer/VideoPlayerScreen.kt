@@ -7,47 +7,37 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.media3.common.util.UnstableApi
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.util.UnstableApi
+import com.bytedance.cloudstorage.data.share.ShareLinkHandledAction
+import com.bytedance.cloudstorage.presentation.share.ShareLinkPromptDialog
 import com.bytedance.cloudstorage.utils.w
-import com.bytedance.cloudstorage.utils.ws
 import kotlinx.coroutines.delay
 
-// ── 工具函数
+// ────────────────────────────────────────────────
+// 视频播放主页面
+// ────────────────────────────────────────────────
 
-internal fun formatSpeed(speed: Float): String {
-    return if (speed % 1f == 0f) {
-        "${speed.toInt()}.0x"
-    } else {
-        "${speed}x"
-    }
-}
-
+/**
+ * 将毫秒格式化为 mm:ss 时间字符串。
+ */
 fun formatTime(ms: Long): String {
     val seconds = (ms / 1000).coerceAtLeast(0)
     val minutes = seconds / 60
@@ -55,27 +45,27 @@ fun formatTime(ms: Long): String {
     return "%02d:%02d".format(minutes, remainSeconds)
 }
 
-// ────────────────────────────────────────────────
-// 视频播放页
-// ────────────────────────────────────────────────
-
 /**
- * 视频播放页主入口，包含播放器卡片、视频信息、选集列表。
- * 支持全屏切换、倍速播放、删除/重命名/下载操作。
+ * 视频播放主页面，展示播放器卡片、视频信息、选集列表，并支持全屏切换。
  *
- * @param fileId 文件 ID
- * @param fileName 文件名
- * @param fileUri 文件 URI
- * @param onBack 返回回调
+ * 通过 [VideoPlayerViewModel] 管理播放状态、进度、选集切换、分享链接等业务逻辑。
+ * 页面退出时自动恢复竖屏并显示系统状态栏。
+ *
+ * @param fileId         当前视频文件 ID
+ * @param fileName       文件显示名称
+ * @param fileUri        视频播放地址
+ * @param onBack         返回上一页回调
+ * @param onOpenShareLink 打开分享链接的回调
+ * @param viewModel      播放器 ViewModel
  */
 @UnstableApi
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoPlayerScreen(
     fileId: String,
     fileName: String,
     fileUri: String,
     onBack: () -> Unit,
+    onOpenShareLink: (String) -> Unit = {},
     viewModel: VideoPlayerViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -87,7 +77,6 @@ fun VideoPlayerScreen(
     }
 
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val playbackSpeed by viewModel.playbackSpeed.collectAsStateWithLifecycle()
     val activeEpisode by viewModel.activeEpisode.collectAsStateWithLifecycle()
     val episodes by viewModel.episodes.collectAsStateWithLifecycle()
     val durationMs by viewModel.duration.collectAsStateWithLifecycle()
@@ -96,6 +85,9 @@ fun VideoPlayerScreen(
     val isPlayerReady by viewModel.isPlayerReady.collectAsStateWithLifecycle()
     val playbackError by viewModel.playbackError.collectAsStateWithLifecycle()
 
+    var isFullscreen by rememberSaveable { mutableStateOf(false) }
+    var copiedShareToken by rememberSaveable { mutableStateOf<String?>(null) }
+
     LaunchedEffect(isDeleted) {
         if (isDeleted) onBack()
     }
@@ -103,6 +95,17 @@ fun VideoPlayerScreen(
     LaunchedEffect(Unit) {
         viewModel.toastMessage.collect { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.createdShareLink.collect { link ->
+            if (link == null) {
+                Toast.makeText(context, "请先选择文件", Toast.LENGTH_SHORT).show()
+            } else {
+                copiedShareToken = link.token
+                Toast.makeText(context, "分享链接已复制", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -115,15 +118,6 @@ fun VideoPlayerScreen(
         }
     }
 
-    // ── 弹窗 / 菜单状态 ──
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showRenameSheet by remember { mutableStateOf(false) }
-    var showMoreSheet by remember { mutableStateOf(false) }
-    var showSpeedMenu by remember { mutableStateOf(false) }
-    var isFullscreen by rememberSaveable { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
-
-    // ── 全屏时切换横屏 ──
     LaunchedEffect(isFullscreen) {
         activity?.requestedOrientation = if (isFullscreen) {
             ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -172,75 +166,6 @@ fun VideoPlayerScreen(
         return
     }
 
-    // ── 更多操作弹窗 ──
-    if (showMoreSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showMoreSheet = false },
-            sheetState = sheetState,
-            containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 16.w.dp, topEnd = 16.w.dp),
-            dragHandle = null
-        ) {
-            VideoMoreSheet(
-                onDownload = {
-                    showMoreSheet = false
-                    viewModel.downloadToDevice()
-                },
-                onShare = {
-                    showMoreSheet = false
-                    Toast.makeText(context, "分享（待实现）", Toast.LENGTH_SHORT).show()
-                },
-                onRename = {
-                    showMoreSheet = false
-                    showRenameSheet = true
-                },
-                onDelete = {
-                    showMoreSheet = false
-                    showDeleteConfirm = true
-                }
-            )
-        }
-    }
-
-    // ── 删除 / 重命名弹窗 ──
-    if (showDeleteConfirm) {
-        ModalBottomSheet(
-            onDismissRequest = { showDeleteConfirm = false },
-            sheetState = sheetState,
-            containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 16.w.dp, topEnd = 16.w.dp),
-            dragHandle = null
-        ) {
-            VideoDeleteSheet(
-                fileName = activeEpisode.title.ifEmpty { fileName },
-                onDismiss = { showDeleteConfirm = false },
-                onConfirm = {
-                    showDeleteConfirm = false
-                    viewModel.deleteVideo()
-                }
-            )
-        }
-    }
-
-    if (showRenameSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showRenameSheet = false },
-            sheetState = sheetState,
-            containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 16.w.dp, topEnd = 16.w.dp),
-            dragHandle = null
-        ) {
-            VideoRenameSheet(
-                currentName = activeEpisode.title.ifEmpty { fileName },
-                onDismiss = { showRenameSheet = false },
-                onConfirm = { newName ->
-                    viewModel.renameVideo(newName)
-                    showRenameSheet = false
-                }
-            )
-        }
-    }
-
     val displayEpisodes = episodes.ifEmpty { listOf(activeEpisode) }.filter { it.id.isNotEmpty() }
 
     Column(
@@ -249,32 +174,24 @@ fun VideoPlayerScreen(
             .background(PageBg)
             .statusBarsPadding()
     ) {
-        // ── 页面主体：播放器 + 信息 + 选集 ──
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(top = 12.w.dp, bottom = 28.w.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 28.w.dp)
         ) {
             PlayerCard(
-                fileUri = fileUri,
+                fileUri = activeEpisode.uri.ifEmpty { fileUri },
                 isPlayerReady = isPlayerReady,
                 isPlaying = isPlaying,
-                playbackSpeed = playbackSpeed,
                 durationMs = durationMs,
                 currentPosition = currentPosition,
                 playbackError = playbackError,
-                showSpeedMenu = showSpeedMenu,
-                onShowSpeedMenu = { showSpeedMenu = true },
-                onDismissSpeedMenu = { showSpeedMenu = false },
-                onSpeedSelected = {
-                    showSpeedMenu = false
-                    viewModel.setPlaybackSpeed(it)
-                },
                 onTogglePlay = { viewModel.togglePlayPause() },
                 onSeek = { viewModel.seekTo(it) },
                 onBack = onBack,
-                onMoreClick = { showMoreSheet = true },
+                onDownload = { viewModel.downloadToDevice() },
+                onShare = { viewModel.createShareLink() },
                 onFullscreen = { isFullscreen = true },
                 onRetry = { viewModel.retryPlay() },
                 viewModel = viewModel
@@ -284,13 +201,30 @@ fun VideoPlayerScreen(
                 title = activeEpisode.title.ifEmpty { fileName },
                 updatedAt = activeEpisode.updatedAt,
                 size = activeEpisode.size,
+                onDownload = { viewModel.downloadToDevice() },
+                onShare = { viewModel.createShareLink() },
             )
 
             EpisodeSection(
                 episodes = displayEpisodes,
                 activeEpisode = activeEpisode,
-                onEpisodeClick = { viewModel.selectEpisode(it) }
+                onEpisodeClick = { viewModel.selectEpisode(it) },
+                modifier = Modifier.weight(1f)
             )
         }
+    }
+
+    copiedShareToken?.let { token ->
+        ShareLinkPromptDialog(
+            onDismiss = {
+                viewModel.markShareLinkHandled(token, ShareLinkHandledAction.Dismissed)
+                copiedShareToken = null
+            },
+            onViewNow = {
+                viewModel.markShareLinkHandled(token, ShareLinkHandledAction.Opened)
+                copiedShareToken = null
+                onOpenShareLink(token)
+            }
+        )
     }
 }

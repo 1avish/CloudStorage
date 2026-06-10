@@ -28,6 +28,26 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+// ────────────────────────────────────────────────
+// 视频播放进度条
+// ────────────────────────────────────────────────
+
+/**
+ * 可拖动的视频播放进度条组件。
+ *
+ * 支持水平拖拽 seek，拖拽期间显示手指位置的进度，松手后提交 seek 请求；
+ * 位置未同步时使用 [pendingSeekFraction] 临时显示，避免跳回旧进度。
+ *
+ * @param viewModel        播放器 ViewModel，读取 [VideoPlayerViewModel.currentPosition]
+ * @param durationMs       视频总时长（毫秒）
+ * @param onSeek           松手时提交 seek 百分比（0f–1f）
+ * @param touchTargetHeight 触摸区域高度
+ * @param trackHeight      轨道高度
+ * @param trackColor       未播放轨道颜色
+ * @param progressColor    已播放轨道颜色
+ * @param thumbColor       圆形指示器颜色
+ * @param thumbSize        圆形指示器直径
+ */
 @Composable
 internal fun VideoProgressBar(
     viewModel: VideoPlayerViewModel,

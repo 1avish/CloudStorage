@@ -10,22 +10,27 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -64,7 +70,7 @@ import java.util.concurrent.TimeUnit
 // 颜色常量，与设计稿对齐
 // ────────────────────────────────────────────────
 private val BgGray         = Color(0xFFF5F6F8)
-private val ProgressBlue   = Color(0xFF2979FF)
+private val ProgressBlue   = Color(0xFFFFE36A)
 private val ProgressYellow = Color(0xFFFAAD14)
 private val ProgressRed    = Color(0xFFFF4D4F)
 private val TextPrimary    = Color(0xFF1D2129)
@@ -87,7 +93,9 @@ private val ChevronGray    = Color(0xFFC0C4D0)
 fun HomeScreen(
     viewModel: HomeViewModel = viewModel(),
     onOpenVideo: (String, String, String) -> Unit = { _, _, _ -> },
-    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> }
+    onOpenTxt: (String, String, String) -> Unit = { _, _, _ -> },
+    onShowAllViews: () -> Unit = {},
+    onShowAllSaves: () -> Unit = {},
 ) {
     // 收集 ViewModel 中的 StateFlow，生命周期感知
     val usedStorageG  by viewModel.usedStorageG.collectAsStateWithLifecycle()
@@ -139,6 +147,7 @@ fun HomeScreen(
                         items = recentSaves,
                         onOpenVideo = onOpenVideo,
                         onOpenTxt = onOpenTxt,
+                        onShowAll = onShowAllSaves,
                     )
                 }
                 item {
@@ -148,6 +157,7 @@ fun HomeScreen(
                         items = recentViews,
                         onOpenVideo = onOpenVideo,
                         onOpenTxt = onOpenTxt,
+                        onShowAll = onShowAllViews,
                     )
                 }
             }
@@ -159,6 +169,12 @@ fun HomeScreen(
 // 加载失败重试组件
 // ────────────────────────────────────────────────
 
+/**
+ * 加载失败占位组件，展示错误图标、错误信息和重试按钮。
+ *
+ * @param message 错误提示文字
+ * @param onRetry 点击重试回调
+ */
 @Composable
 private fun ErrorRetryContent(
     message: String,
@@ -197,7 +213,7 @@ private fun ErrorRetryContent(
                     text = "重试",
                     fontSize = 15.ws.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.White,
+                    color = TextPrimary,
                 )
             }
         }
@@ -240,7 +256,7 @@ private fun PersonalSpaceCard(
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
-                            colors = listOf(Color(0xFF4A90FF), Color(0xFF2979FF))
+                                colors = listOf(Color(0xFFFFE36A), Color(0xFFFFB85C))
                         )
                     ),
                 contentAlignment = Alignment.Center
@@ -317,6 +333,7 @@ private fun RecentFileCard(
     items: List<RecentFileWithFolderInfo>,
     onOpenVideo: (String, String, String) -> Unit,
     onOpenTxt: (String, String, String) -> Unit,
+    onShowAll: () -> Unit,
 ) {
     // 折叠状态，默认展开
     var expanded by remember { mutableStateOf(true) }
@@ -328,10 +345,9 @@ private fun RecentFileCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(18.w.dp)) {
-            // 标题行
+            // 标题行：标题 | 折叠按钮(紧邻标题) | spacer | 全部>
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
@@ -340,15 +356,38 @@ private fun RecentFileCard(
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary,
                 )
+                // 折叠/展开按钮，放在标题右侧
                 IconButton(
                     onClick = { expanded = !expanded },
-                    modifier = Modifier.size(32.w.dp)
+                    modifier = Modifier.size(30.w.dp)
                 ) {
                     Icon(
-                        imageVector = if (expanded) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        imageVector = Icons.Default.Visibility,
                         contentDescription = if (expanded) "折叠" else "展开",
-                        tint = TextGray,
+                        tint = Color(0xFF737373),
                         modifier = Modifier.size(18.w.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                // 全部 > 按钮
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.w.dp))
+                        .clickable { onShowAll() }
+                        .padding(horizontal = 10.w.dp, vertical = 6.w.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "全部",
+                        fontSize = 14.ws.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF696969),
+                    )
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "查看全部",
+                        tint = Color(0xFF696969),
+                        modifier = Modifier.size(16.w.dp)
                     )
                 }
             }
@@ -390,6 +429,108 @@ private fun RecentFileCard(
 }
 
 // ────────────────────────────────────────────────
+// 全部记录页面（点击「全部>」后展示）
+// ────────────────────────────────────────────────
+
+/**
+ * 全部最近记录页面。
+ *
+ * 样式与首页 RecentFileCard 内的记录保持一致：
+ * 相同的图标大小、文字规格、分割线样式。
+ *
+ * @param title    页面标题，如「全部最近浏览」
+ * @param items    全部记录列表
+ * @param onBack   返回按钮回调
+ */
+@Composable
+internal fun AllRecentRecordsScreen(
+    title: String,
+    items: List<RecentFileWithFolderInfo>,
+    onBack: () -> Unit,
+    onOpenVideo: (String, String, String) -> Unit,
+    onOpenTxt: (String, String, String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgGray)
+    ) {
+        // 顶部栏：返回箭头 + 居中标题，替换 tab 区域
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .height(56.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(48.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "返回",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = title,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                )
+            }
+            // 右侧占位，保持标题居中
+            Spacer(modifier = Modifier.size(48.dp))
+        }
+
+        Spacer(modifier = Modifier.height(12.w.dp))
+
+        if (items.isEmpty()) {
+            EmptyState(hint = "暂无记录", cardHeight = 200.w.dp)
+        } else {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.w.dp),
+                shape = RoundedCornerShape(16.w.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(18.w.dp)
+                ) {
+                    items.forEachIndexed { index, item ->
+                        RecentFileItemRow(
+                            item = item,
+                            onOpenVideo = onOpenVideo,
+                            onOpenTxt = onOpenTxt,
+                        )
+                        if (index < items.lastIndex) {
+                            Spacer(modifier = Modifier.height(8.w.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.w.dp)
+                                    .height(2.dp)
+                                    .background(DividerColor)
+                            )
+                            Spacer(modifier = Modifier.height(8.w.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ────────────────────────────────────────────────
 // 空状态组件
 // ────────────────────────────────────────────────
 
@@ -400,7 +541,7 @@ private fun RecentFileCard(
  * @param cardHeight 卡片高度
  */
 @Composable
-private fun EmptyState(hint: String, cardHeight: Dp) {
+internal fun EmptyState(hint: String, cardHeight: Dp) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -436,7 +577,7 @@ private fun EmptyState(hint: String, cardHeight: Dp) {
  * @param item 带父文件夹信息的文件项
  */
 @Composable
-private fun RecentFileItemRow(
+internal fun RecentFileItemRow(
     item: RecentFileWithFolderInfo,
     onOpenVideo: (String, String, String) -> Unit,
     onOpenTxt: (String, String, String) -> Unit,

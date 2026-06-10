@@ -282,7 +282,7 @@ private fun SharedFileRow(
 ) {
     val (icon, iconBg, iconTint) = remember(file.type) { fileStyle(file.type) }
     // 选中行背景色高亮
-    val rowBg = if (selected) Color(0xFFF6F8FF) else Color.White
+    val rowBg = if (selected) Color(0xFFFFF8D8) else Color.White
 
     Row(
         modifier = Modifier
@@ -357,7 +357,7 @@ private fun SharedFileRow(
 /**
  * 圆形选中指示器。
  *
- * 未选中：灰色空心圆边框；选中：蓝色实心圆 + 白色勾号。
+ * 未选中：灰色空心圆边框；选中：黄色实心圆 + 深色勾号。
  */
 @Composable
 private fun SelectionCircle(
@@ -381,7 +381,7 @@ private fun SelectionCircle(
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = "已选择",
-                tint = Color.White,
+                tint = TextPrimary,
                 modifier = Modifier.size(17.w.dp)
             )
         }

@@ -42,6 +42,26 @@ interface FileDao {
     fun getRecentSavedFiles(): Flow<List<FileEntity>>
 
     /**
+     * 获取最近浏览的全部文件（无数量限制）
+     */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND lastOpenedAt IS NOT NULL
+        ORDER BY lastOpenedAt DESC
+    """)
+    fun getAllRecentOpenedFiles(): Flow<List<FileEntity>>
+
+    /**
+     * 获取最近转存的全部文件（无数量限制）
+     */
+    @Query("""
+        SELECT * FROM files
+        WHERE isDeleted = 0 AND lastSavedAt IS NOT NULL
+        ORDER BY lastSavedAt DESC
+    """)
+    fun getAllRecentSavedFiles(): Flow<List<FileEntity>>
+
+    /**
      * 批量插入文件（用于 Mock 数据初始化）
      *
      * OnConflictStrategy.REPLACE：主键冲突时覆盖旧数据。
