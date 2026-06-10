@@ -60,7 +60,7 @@ data class Episode(
 /**
  * 视频播放 ViewModel
  *
- * 管理 ExoPlayer 实例、播放状态、倍速、进度、选集列表，
+ * 管理 ExoPlayer 实例、播放状态、进度、选集列表，
  * 同时处理视频的删除、重命名、下载等文件操作。
  */
 class VideoPlayerViewModel(application: Application) : AndroidViewModel(application) {
@@ -70,9 +70,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
-
-    private val _playbackSpeed = MutableStateFlow(1f)
-    val playbackSpeed: StateFlow<Float> = _playbackSpeed.asStateFlow()
 
     private val _duration = MutableStateFlow(0L)
     val duration: StateFlow<Long> = _duration.asStateFlow()
@@ -201,15 +198,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             val player = exoPlayer ?: initPlayer(episode.uri)
             player.setMediaItem(MediaItem.fromUri(Uri.parse(episode.uri)))
             player.prepare()
-            player.setPlaybackSpeed(_playbackSpeed.value)
             player.play()
         }
-    }
-
-    fun setPlaybackSpeed(speed: Float) {
-        val safeSpeed = speed.coerceIn(0.25f, 3f)
-        _playbackSpeed.value = safeSpeed
-        exoPlayer?.setPlaybackSpeed(safeSpeed)
     }
 
     /** 播放出错后重试：清除错误状态，重新初始化播放器 */
