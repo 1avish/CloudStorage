@@ -67,15 +67,17 @@ internal fun FileListItem(
     val formattedTime = remember(file.updatedAt) { formatTimestamp(file.updatedAt) }
 
     // 圆圈选中静态样式
-    val circleBg = if (isSelected) Color(0xFF3370FF) else Color.Transparent
-    val circleBorder = if (isSelected) Color(0xFF3370FF) else EmptyIconTint
-    val rowBg = if (isSelected) Color(0xFFEBF0FF) else Color.Transparent
+    val circleBg = if (isSelected) Color(0xFFFFE36A) else Color.Transparent
+    val circleBorder = if (isSelected) Color(0xFFFFE36A) else Color(0xFFDADADA)
+    val rowBg = Color.Transparent
+    val itemHeight = 74.w.dp
+    val rowHeight = 72.w.dp
 
-    Column(modifier = Modifier.height(74.w.dp)) {
+    Column(modifier = Modifier.height(itemHeight)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(72.w.dp)
+                .height(rowHeight)
                 .background(rowBg)
                 .then(
                     if (isSelectionMode) {
@@ -166,7 +168,7 @@ internal fun FileListItem(
             // 右侧圆形选择按钮
             Box(
                 modifier = Modifier
-                    .size(40.w.dp, 72.w.dp)
+                    .size(44.w.dp, rowHeight)
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -189,7 +191,7 @@ internal fun FileListItem(
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = "已选中",
-                            tint = Color.White,
+                            tint = Color(0xFF111111),
                             modifier = Modifier.size(14.w.dp)
                         )
                     }

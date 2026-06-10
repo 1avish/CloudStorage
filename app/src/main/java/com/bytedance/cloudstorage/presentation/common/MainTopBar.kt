@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.SwapHorizontalCircle
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -80,7 +81,7 @@ fun MainTopBar(
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         if (isSelectionMode) {
-            // ── 选择模式：取消 | 已选中 N 个文件 | 全选 ──
+            // ── 选择模式：关闭 | 管理文件 + 已选择 N 项 | 全选 ──
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -88,30 +89,44 @@ fun MainTopBar(
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "取消",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color(0xFF3370FF),
-                    modifier = Modifier.clickable { onCancelSelection() }
-                )
+                IconButton(
+                    onClick = onCancelSelection,
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "取消",
+                        tint = Color(0xFF111111),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
                 Box(
                     modifier = Modifier.weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "已选中 $selectedCount 个文件",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "管理文件",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF111111)
+                        )
+                        Text(
+                            text = "已选择${selectedCount}项",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color(0xFF8A8A8A)
+                        )
+                    }
                 }
                 Text(
                     text = "全选",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color(0xFF3370FF),
-                    modifier = Modifier.clickable { onSelectAll() }
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF111111),
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .clickable { onSelectAll() }
                 )
             }
         } else {

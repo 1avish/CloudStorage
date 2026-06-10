@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -352,18 +353,13 @@ private fun RecentFileCard(
                 // 折叠/展开按钮，放在标题右侧
                 IconButton(
                     onClick = { expanded = !expanded },
-                    modifier = Modifier.size(32.w.dp)
+                    modifier = Modifier.size(30.w.dp)
                 ) {
                     Icon(
-                        imageVector = if (expanded)
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight
-                        else
-                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        imageVector = Icons.Default.Visibility,
                         contentDescription = if (expanded) "折叠" else "展开",
-                        tint = TextGray,
-                        modifier = Modifier
-                            .size(18.w.dp)
-                            .graphicsLayer { rotationZ = if (expanded) 90f else 0f }
+                        tint = Color(0xFF737373),
+                        modifier = Modifier.size(18.w.dp)
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
@@ -379,12 +375,12 @@ private fun RecentFileCard(
                         text = "全部",
                         fontSize = 14.ws.sp,
                         fontWeight = FontWeight.Medium,
-                        color = ProgressBlue,
+                        color = Color(0xFF696969),
                     )
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = "查看全部",
-                        tint = ProgressBlue,
+                        tint = Color(0xFF696969),
                         modifier = Modifier.size(16.w.dp)
                     )
                 }

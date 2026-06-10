@@ -11,11 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Link
@@ -49,151 +47,95 @@ internal fun BottomSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
-            .padding(horizontal = 20.w.dp)
-            .padding(bottom = 32.w.dp)
+            .padding(horizontal = 16.w.dp)
+            .padding(top = 8.w.dp, bottom = 16.w.dp)
     ) {
-        // 拖拽手柄
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.w.dp),
-            contentAlignment = Alignment.Center
+                .padding(top = 14.w.dp,bottom = 16.w.dp)
         ) {
-            Box(
+            Column(
                 modifier = Modifier
-                    .size(width = 40.w.dp, height = 4.w.dp)
-                    .clip(RoundedCornerShape(2.w.dp))
-                    .background(DividerColor)
-            )
-        }
-
-        // ── 保存分享 ──
-        Text(
-            text = "保存分享",
-            fontSize = 20.ws.sp,
-            fontWeight = FontWeight.Bold,
-            color = TextPrimary,
-            modifier = Modifier.padding(top = 4.w.dp, bottom = 12.w.dp)
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.w.dp))
-                .background(Color(0xFFF5F7FA))
-                .clickable { onSaveShare() }
-                .padding(horizontal = 16.w.dp, vertical = 16.w.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.w.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Icon(
-                    imageVector = Icons.Default.Link,
-                    contentDescription = null,
-                    tint = Color(0xFF3370FF),
-                    modifier = Modifier.size(22.w.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.w.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "输入分享链接",
-                    fontSize = 16.ws.sp,
+                    text = "上传文件",
+                    fontSize = 22.ws.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextPrimary
                 )
-            }
-
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = TextSecondary,
-                modifier = Modifier.size(20.w.dp)
-            )
-        }
-
-        // ── 上传文件 ──
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 24.w.dp, bottom = 14.w.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "上传文件",
-                fontSize = 20.ws.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { onDismiss() }
-            ) {
+                Spacer(modifier = Modifier.height(4.w.dp))
                 Text(
-                    text = "保存到 网盘/文件",
-                    fontSize = 13.ws.sp,
+                    text = "文件将保存至「网盘」",
+                    fontSize = 12.ws.sp,
+                    fontWeight = FontWeight.Normal,
                     color = TextSecondary
                 )
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(24.w.dp)
+                    .clip(RoundedCornerShape(22.w.dp))
+                    .clickable { onDismiss() },
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(14.w.dp)
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "关闭",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(22.w.dp)
                 )
             }
         }
+
+        val actions = listOf(
+            Triple("视频", Icons.Default.OndemandVideo, Color(0xFF9B6CFF)),
+            Triple("文档", Icons.Default.Description, Color(0xFF58D27F)),
+            Triple("新建文件夹", Icons.Default.CreateNewFolder, Color(0xFF7389FF)),
+            Triple("保存分享", Icons.Default.Link, Color(0xFF4D8BFF))
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.w.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            listOf(
-                Triple("视频", Icons.Default.OndemandVideo, Color(0xFF3370FF)),
-                Triple("文档", Icons.Default.Description, Color(0xFF3370FF)),
-                Triple("新建文件夹", Icons.Default.CreateNewFolder, Color(0xFF3370FF))
-            ).forEach { (label, icon, iconColor) ->
+            actions.forEach { (label, icon, iconColor) ->
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .clip(RoundedCornerShape(12.w.dp))
-                        .background(Color(0xFFF5F7FA))
                         .clickable {
                             when (label) {
+                                "保存分享" -> onSaveShare()
                                 "新建文件夹" -> onNewFolder()
                                 "视频" -> onUploadVideo()
                                 "文档" -> onUploadDoc()
                                 else -> onDismiss()
                             }
                         }
-                        .padding(vertical = 18.w.dp),
+                        .padding(vertical = 4.w.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(50.w.dp)
-                            .clip(CircleShape)
-                            .background(Color.White),
+                            .size(56.w.dp)
+                            .clip(RoundedCornerShape(10.w.dp))
+                            .background(iconColor),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = label,
-                            tint = iconColor,
-                            modifier = Modifier.size(26.w.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(31.w.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(10.w.dp))
+                    Spacer(modifier = Modifier.height(12.w.dp))
                     Text(
                         text = label,
-                        fontSize = 14.ws.sp,
+                        fontSize = 15.ws.sp,
                         fontWeight = FontWeight.Medium,
                         color = TextPrimary
                     )

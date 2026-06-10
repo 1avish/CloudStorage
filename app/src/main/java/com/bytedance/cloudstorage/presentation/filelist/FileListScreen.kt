@@ -1,10 +1,7 @@
 package com.bytedance.cloudstorage.presentation.filelist
 
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -13,20 +10,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,10 +32,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -83,8 +70,6 @@ fun FileListScreen(
     val moveTargetPathStack by viewModel.moveTargetPathStack.collectAsStateWithLifecycle()
     val moveTargetFolders by viewModel.moveTargetFolders.collectAsStateWithLifecycle()
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
-    var showCreateSheet by remember { mutableStateOf(false) }
-    var showSaveShareSheet by remember { mutableStateOf(false) } // 输入分享链接弹窗
     var showNewFolderSheet by remember { mutableStateOf(false) }
     /** 标记当前新建文件夹是否来自移动选择器（用于返回后重新打开选择器） */
     var isCreatingMoveTargetFolder by remember { mutableStateOf(false) }
@@ -98,12 +83,6 @@ fun FileListScreen(
     val moveSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val context = LocalContext.current
-    val filePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        uri ?: return@rememberLauncherForActivityResult
-        uploadSelectedFile(context, uri, viewModel, files)
-    }
 
     LaunchedEffect(viewModel) {
         viewModel.createdShareLink.collect { link ->
@@ -112,18 +91,6 @@ fun FileListScreen(
             } else {
                 copiedShareToken = link.token
                 Toast.makeText(context, "分享链接已复制", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    LaunchedEffect(viewModel) {
-        viewModel.shareTokenLookupResult.collect { token ->
-            if (token == null) {
-                Toast.makeText(context, "分享链接不存在", Toast.LENGTH_SHORT).show()
-            } else {
-                viewModel.markShareLinkHandled(token, ShareLinkHandledAction.Opened)
-                showSaveShareSheet = false
-                onOpenShareLink(token)
             }
         }
     }
@@ -235,7 +202,7 @@ fun FileListScreen(
                             .testTag("file_list")
                             .padding(horizontal = 4.w.dp),
                         contentPadding = PaddingValues(
-                            bottom = if (isSelectionMode) 180.w.dp else 96.w.dp
+                            bottom = if (isSelectionMode) 116.w.dp else 96.w.dp
                         )
                     ) {
                         items(
@@ -269,66 +236,6 @@ fun FileListScreen(
             }
         }
 
-        // ── 悬浮按钮：选择模式下隐藏 ──
-        if (!isSelectionMode) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .offset(x = (-24).w.dp, y = (-48).w.dp)
-                    .size(56.w.dp)
-                    .shadow(
-                        elevation = 12.dp,
-                        shape = CircleShape,
-                        ambientColor = PrimaryBlue.copy(alpha = 0.3f),
-                        spotColor = PrimaryBlue.copy(alpha = 0.25f)
-                    )
-                    .clip(CircleShape)
-                    .clickable { showCreateSheet = true },
-                contentAlignment = Alignment.Center
-            ) {
-                // 底层：斜向渐变
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.linearGradient(
-                                colorStops = arrayOf(
-                                    0.0f to Color(0xFF7AAEFF),
-                                    0.33f to Color(0xFF3B82F6),
-                                    0.66f to Color(0xFF3B82F6),
-                                    1.0f to Color(0xFF7AAEFF)
-                                ),
-                                start = Offset(0f, Float.POSITIVE_INFINITY),
-                                end = Offset(Float.POSITIVE_INFINITY, 0f)
-                            )
-                        )
-                )
-                // 光泽层：左上角径向高光
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.35f),
-                                    Color.Yellow.copy(alpha = 0.08f),
-                                    Color.Transparent
-                                ),
-                                center = Offset(15f, 15f),
-                                radius = 56f
-                            )
-                        )
-                )
-                // 图标
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "创建文件夹",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.w.dp)
-                )
-            }
-        }
-
         // ── 选择模式底部操作栏（非模态、不遮挡背景）──
         if (isSelectionMode) {
             Surface(
@@ -337,7 +244,7 @@ fun FileListScreen(
                     .fillMaxWidth(),
                 color = Color.White,
                 shadowElevation = 8.dp,
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
             ) {
                 FileActionBar(
                     selectedFiles = selectedFiles,
@@ -362,57 +269,6 @@ fun FileListScreen(
                     onToggleFile = { fileId -> viewModel.toggleFileSelection(fileId) }
                 )
             }
-        }
-    }
-
-    if (showCreateSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showCreateSheet = false },
-            sheetState = sheetState,
-            containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-            dragHandle = null
-        ) {
-            BottomSheetContent(
-                onDismiss = { showCreateSheet = false },
-                onSaveShare = {
-                    // 「保存分享」→ 关闭创建弹窗，打开输入分享链接弹窗
-                    showCreateSheet = false
-                    showSaveShareSheet = true
-                },
-                onNewFolder = {
-                    showCreateSheet = false
-                    showNewFolderSheet = true
-                },
-                onUploadVideo = {
-                    showCreateSheet = false
-                    filePickerLauncher.launch(arrayOf("video/*"))
-                },
-                onUploadDoc = {
-                    showCreateSheet = false
-                    filePickerLauncher.launch(arrayOf("text/plain"))
-                }
-            )
-        }
-    }
-
-    // ── 保存分享弹窗：输入分享链接后解析 token 并跳转 ──
-    if (showSaveShareSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showSaveShareSheet = false },
-            sheetState = sheetState,
-            containerColor = Color.White,
-            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-            dragHandle = null
-        ) {
-            TextInputBottomSheet(
-                title = "保存分享",
-                placeholder = "请输入分享链接",
-                onDismiss = { showSaveShareSheet = false },
-                onConfirm = { link ->
-                    viewModel.findExistingShareToken(link)
-                }
-            )
         }
     }
 
