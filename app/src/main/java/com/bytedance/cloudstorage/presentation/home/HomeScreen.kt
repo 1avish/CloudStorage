@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,10 +21,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -48,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -373,6 +375,7 @@ private fun RecentFileCard(
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(16.w.dp))
+                        .testTag(if (title == "最近浏览") "recent_views_all" else "recent_saves_all")
                         .clickable { onShowAll() }
                         .padding(horizontal = 10.w.dp, vertical = 6.w.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -453,7 +456,7 @@ internal fun AllRecentRecordsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgGray)
+            .background(Color.White)
     ) {
         // 顶部栏：返回箭头 + 居中标题，替换 tab 区域
         Row(
@@ -493,36 +496,39 @@ internal fun AllRecentRecordsScreen(
         if (items.isEmpty()) {
             EmptyState(hint = "暂无记录", cardHeight = 200.w.dp)
         } else {
-            Card(
+            val lastFileId = items.last().file.id
+            val listState = rememberLazyListState()
+            LazyColumn(
+                state = listState,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
+                    .testTag("recent_record_list")
                     .padding(horizontal = 16.w.dp),
-                shape = RoundedCornerShape(16.w.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                contentPadding = PaddingValues(
+                    top = 6.w.dp,
+                    bottom = 24.w.dp
+                )
             ) {
-                Column(
-                    modifier = Modifier
-                        .verticalScroll(rememberScrollState())
-                        .padding(18.w.dp)
-                ) {
-                    items.forEachIndexed { index, item ->
-                        RecentFileItemRow(
-                            item = item,
-                            onOpenVideo = onOpenVideo,
-                            onOpenTxt = onOpenTxt,
+                items(
+                    items = items,
+                    key = { item -> item.file.id },
+                    contentType = { item -> item.file.type.name }
+                ) { item ->
+                    RecentFileItemRow(
+                        item = item,
+                        onOpenVideo = onOpenVideo,
+                        onOpenTxt = onOpenTxt,
+                    )
+                    if (item.file.id != lastFileId) {
+                        Spacer(modifier = Modifier.height(8.w.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.w.dp)
+                                .height(2.dp)
+                                .background(DividerColor)
                         )
-                        if (index < items.lastIndex) {
-                            Spacer(modifier = Modifier.height(8.w.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.w.dp)
-                                    .height(2.dp)
-                                    .background(DividerColor)
-                            )
-                            Spacer(modifier = Modifier.height(8.w.dp))
-                        }
+                        Spacer(modifier = Modifier.height(8.w.dp))
                     }
                 }
             }
@@ -583,6 +589,8 @@ internal fun RecentFileItemRow(
     onOpenTxt: (String, String, String) -> Unit,
 ) {
     val (icon, iconBg, iconTint) = remember(item.file.type) { fileStyle(item.file.type) }
+    val timestamp = item.file.lastOpenedAt ?: item.file.lastSavedAt ?: item.file.updatedAt
+    val formattedTime = remember(timestamp) { formatTimestamp(timestamp) }
     val clickAction = when (item.file.type) {
         FileType.Video -> {
             { onOpenVideo(item.file.id, item.file.name, item.file.uri ?: "") }
@@ -592,11 +600,13 @@ internal fun RecentFileItemRow(
         }
         else -> null
     }
-    val typeLabel = when (item.file.type) {
-        FileType.Video -> "视频"
-        FileType.Txt -> "文档"
-        FileType.Folder -> "文件夹"
-        FileType.Other -> "其他"
+    val typeLabel = remember(item.file.type) {
+        when (item.file.type) {
+            FileType.Video -> "视频"
+            FileType.Txt -> "文档"
+            FileType.Folder -> "文件夹"
+            FileType.Other -> "其他"
+        }
     }
 
     Row(
@@ -652,7 +662,7 @@ internal fun RecentFileItemRow(
             // 第三行：位置信息 + 箭头
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = formatTimestamp(item.file.lastOpenedAt ?: item.file.lastSavedAt ?: item.file.updatedAt),
+                    text = formattedTime,
                     fontSize = 12.ws.sp,
                     color = TextSecondary,
                     fontWeight = FontWeight.Medium

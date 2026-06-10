@@ -226,7 +226,10 @@ fun AppNavGraph(
             popExitTransition = { ExitTransition.None }
         ) { backStackEntry ->
             val type = Screen.decodeRouteArg(backStackEntry.arguments?.getString("type") ?: "views")
-            val homeViewModel: HomeViewModel = viewModel()
+            val mainBackStackEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(Screen.Main)
+            }
+            val homeViewModel: HomeViewModel = viewModel(viewModelStoreOwner = mainBackStackEntry)
             val allViews by homeViewModel.allRecentViews.collectAsStateWithLifecycle()
             val allSaves by homeViewModel.allRecentSaves.collectAsStateWithLifecycle()
             val title = if (type == "views") "最近浏览" else "最近转存"

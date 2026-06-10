@@ -40,6 +40,43 @@ class BaselineProfileGenerator {
                     fileList.fling(Direction.UP)
                     device.waitForIdle()
                 }
+
+                val homeTab = device.wait(
+                    Until.findObject(By.res("com.bytedance.cloudstorage:id/main_tab_home")),
+                    5_000
+                ) ?: return@collect
+                homeTab.click()
+                device.waitForIdle()
+
+                var recentViewsAll = device.wait(
+                    Until.findObject(By.res("com.bytedance.cloudstorage:id/recent_views_all")),
+                    2_000
+                )
+                if (recentViewsAll == null) {
+                    device.swipe(
+                        device.displayWidth / 2,
+                        device.displayHeight * 3 / 4,
+                        device.displayWidth / 2,
+                        device.displayHeight / 4,
+                        20
+                    )
+                    recentViewsAll = device.wait(
+                        Until.findObject(By.res("com.bytedance.cloudstorage:id/recent_views_all")),
+                        3_000
+                    )
+                }
+                recentViewsAll?.click() ?: return@collect
+
+                val recentRecordList = device.wait(
+                    Until.findObject(By.res("com.bytedance.cloudstorage:id/recent_record_list")),
+                    5_000
+                ) ?: return@collect
+                repeat(6) {
+                    recentRecordList.fling(Direction.DOWN)
+                    device.waitForIdle()
+                    recentRecordList.fling(Direction.UP)
+                    device.waitForIdle()
+                }
             }
         )
     }
