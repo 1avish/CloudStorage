@@ -46,7 +46,6 @@ private val BreadcrumbDivider = Color(0xFFD0D3D9)
  * @param onTabSelected Tab 点击回调
  * @param transferTaskCount 传输任务数，大于 0 时显示徽标
  * @param onTransferClick 传输按钮点击回调
- * @param onSearchClick 搜索按钮点击回调
  * @param hasBack 是否显示返回按钮（在子目录时为 true）
  * @param onBackClick 返回按钮点击回调
  * @param currentFolderName 当前文件夹名称，null 时显示 tabs（根目录）
@@ -63,7 +62,6 @@ fun MainTopBar(
     onTabSelected: (Int) -> Unit,
     transferTaskCount: Int = 0,
     onTransferClick: () -> Unit,
-    onSearchClick: () -> Unit,
     hasBack: Boolean = false,
     onBackClick: () -> Unit = {},
     currentFolderName: String? = null,

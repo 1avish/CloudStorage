@@ -130,9 +130,6 @@ fun MainScreen(
                 },
                 transferTaskCount = 0,
                 onTransferClick = onOpenTransfer,
-                onSearchClick = {
-                    Toast.makeText(context, "搜索（待实现）", Toast.LENGTH_SHORT).show()
-                },
                 hasBack = hasBack,
                 onBackClick = { fileListViewModel.navigateBack() },
                 currentFolderName = currentFolderName,

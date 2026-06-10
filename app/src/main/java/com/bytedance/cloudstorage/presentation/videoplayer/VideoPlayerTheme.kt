@@ -24,4 +24,3 @@ internal val ControlWhite = Color.White
 internal val BlueSoft = Color(0xFFFFF8D8)
 /** 底部弹窗背景色 */
 internal val SheetBg = Color(0xFFF5F7FA)
-/** 倍速选项列表 */
