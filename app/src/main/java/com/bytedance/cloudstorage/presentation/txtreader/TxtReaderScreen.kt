@@ -31,7 +31,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,11 +38,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -54,7 +57,6 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 // ── TXT 阅读器入口 ──
 
@@ -179,7 +181,12 @@ private fun TxtPagerContent(
         color = uiState.readerText,
         fontSize = uiState.currentFontSize.ws.sp,
         lineHeight = uiState.currentLineHeight.ws.sp,
-        fontFamily = FontFamily.SansSerif
+        fontFamily = FontFamily.SansSerif,
+        platformStyle = PlatformTextStyle(includeFontPadding = false),
+        lineHeightStyle = LineHeightStyle(
+            alignment = LineHeightStyle.Alignment.Center,
+            trim = LineHeightStyle.Trim.Both
+        )
     )
     val horizontalPadding = 24.w.dp
     val verticalPadding = 36.w.dp
@@ -214,28 +221,14 @@ private fun TxtPagerContent(
     }
 
     val pagerState = rememberPagerState(pageCount = { uiState.pages.size })
-    val pendingPageRestoreFraction = remember { mutableStateOf<Float?>(null) }
-    val lastPaginatedFileKey = remember { mutableStateOf<String?>(null) }
 
-    // 分页完成时防止页码越界；设置变化触发重新分页时，尽量保持原阅读进度。
+    // 分页完成时防止页码越界
     LaunchedEffect(uiState.pages.size, uiState.isPaginating) {
         val pageCount = uiState.pages.size
         if (pageCount == 0) return@LaunchedEffect
 
-        pendingPageRestoreFraction.value?.let { fraction ->
-            val targetPage = (uiState.pages.lastIndex * fraction)
-                .roundToInt()
-                .coerceIn(0, uiState.pages.lastIndex)
-            if (pagerState.currentPage != targetPage) {
-                pagerState.scrollToPage(targetPage)
-            }
-            if (!uiState.isPaginating) {
-                pendingPageRestoreFraction.value = null
-            }
-        } ?: run {
-            if (!uiState.isPaginating && pagerState.currentPage >= pageCount) {
-                pagerState.scrollToPage(uiState.pages.lastIndex)
-            }
+        if (!uiState.isPaginating && pagerState.currentPage >= pageCount) {
+            pagerState.scrollToPage(uiState.pages.lastIndex)
         }
     }
 
@@ -270,21 +263,26 @@ private fun TxtPagerContent(
                 val contentHeightPx = with(density) {
                     (availableHeight - verticalPadding * 2).roundToPx()
                 }.coerceAtLeast(1)
-                val lineHeightPx = with(density) { bodyStyle.lineHeight.toPx() }.coerceAtLeast(1f)
-                val maxLines = max(1, floor(contentHeightPx / lineHeightPx).toInt())
+                val measuredLineHeightPx = remember(
+                    textMeasurer,
+                    bodyStyle,
+                    contentWidthPx
+                ) {
+                    textMeasurer.measure(
+                        text = AnnotatedString("国\n国"),
+                        style = bodyStyle,
+                        constraints = Constraints(maxWidth = contentWidthPx)
+                    ).size.height / 2f
+                }.coerceAtLeast(with(density) { bodyStyle.lineHeight.toPx() }.coerceAtLeast(1f))
+                val maxLines = max(1, floor(contentHeightPx / measuredLineHeightPx).toInt())
 
                 // 触发分页
                 LaunchedEffect(fileKey, fileName, fileUri, contentWidthPx, maxLines, uiState.fontSizeIndex, uiState.lineSpacingIndex) {
                     viewModel.markFileOpened(fileId)
-                    pendingPageRestoreFraction.value = if (lastPaginatedFileKey.value == fileKey && uiState.pages.size > 1) {
-                        pagerState.currentPage
-                            .coerceIn(0, uiState.pages.lastIndex)
-                            .toFloat() / uiState.pages.lastIndex
-                    } else {
-                        null
-                    }
-                    lastPaginatedFileKey.value = fileKey
                     viewModel.startPagination()
+                    if (pagerState.currentPage != 0) {
+                        pagerState.scrollToPage(0)
+                    }
 
                     val paginationStartMs: Long
                     var firstPageLogged = false
@@ -332,9 +330,6 @@ private fun TxtPagerContent(
                     viewModel.finishPagination()
                     if (uiState.errorMessage == null && DEBUG_READER_LOG) {
                         logReaderMetric("complete", fileName, uiState.pages.size, paginationStartMs)
-                    }
-                    if (pagerState.currentPage >= uiState.pages.size) {
-                        pagerState.scrollToPage((uiState.pages.lastIndex).coerceAtLeast(0))
                     }
                 }
 

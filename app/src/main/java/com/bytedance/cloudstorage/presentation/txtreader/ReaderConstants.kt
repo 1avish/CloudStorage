@@ -46,6 +46,13 @@ internal const val READ_BUFFER_SIZE = 16 * 1024
 
 // 每个文本分段的最大字符数（8KB），分段送给 TextMeasurer 测量
 // 越大测量越准（减少跨段边界误差），但单次测量越慢
+internal val ReaderLineHeightMultipliers = listOf(1.40f, 1.55f, 1.70f, 1.90f)
+
+internal fun readerLineHeight(fontSize: Int, lineSpacingIndex: Int): Float {
+    val multiplier = ReaderLineHeightMultipliers[lineSpacingIndex.coerceIn(ReaderLineHeightMultipliers.indices)]
+    return fontSize * multiplier
+}
+
 internal const val MAX_SEGMENT_CHARS = 8 * 1024
 internal const val READER_METRICS_TAG = "TxtReaderMetrics"
 internal const val LOG_PROGRESS_PAGE_INTERVAL = 50

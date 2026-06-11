@@ -61,7 +61,9 @@ internal fun ReaderSettingsOverlay(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
-        activePanel?.let { panel ->
+        activePanel
+            ?.takeIf { it == ReaderSettingPanel.Brightness || it == ReaderSettingPanel.Background }
+            ?.let { panel ->
             ReaderSettingPanelContent(
                 panel = panel,
                 brightness = brightness,
@@ -379,6 +381,7 @@ private fun ReaderSettingsBottomBar(
                 onClick = { onActivePanelChange(ReaderSettingPanel.Background) },
                 modifier = Modifier.weight(1f)
             )
+            if (false) {
             ReaderBottomBarItem(
                 label = "字体",
                 icon = Icons.Default.FormatSize,
@@ -395,6 +398,7 @@ private fun ReaderSettingsBottomBar(
                 onClick = { onActivePanelChange(ReaderSettingPanel.LineSpacing) },
                 modifier = Modifier.weight(1f)
             )
+            }
         }
     }
 }

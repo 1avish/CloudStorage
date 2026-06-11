@@ -35,7 +35,7 @@ internal data class ReaderUiState(
     val readerText get() = if (isDarkReader) Color(0xFFEDEFF3) else ReaderText
     val readerSubText get() = if (isDarkReader) Color(0xFF9CA3AF) else ReaderSubText
     val currentFontSize get() = ReaderFontSizes[fontSizeIndex]
-    val currentLineHeight get() = ReaderLineHeights[lineSpacingIndex]
+    val currentLineHeight get() = readerLineHeight(currentFontSize, lineSpacingIndex)
 }
 
 /**
