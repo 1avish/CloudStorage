@@ -572,10 +572,27 @@ class FileRepository(
         )
     }
 
-    /** 批量逻辑删除文件 */
+    /** 批量逻辑删除文件（含文件夹递归删除） */
     suspend fun deleteFiles(ids: List<String>) {
-        remoteDataSource.deleteFiles(ids)
-        fileDao.deleteFiles(ids)
+        val allIds = ids.toMutableSet()
+        // 递归收集所有文件夹子树的文件 ID
+        for (id in ids) {
+            collectDescendantIds(id, allIds)
+        }
+        val idsToDelete = allIds.toList()
+        remoteDataSource.deleteFiles(idsToDelete)
+        fileDao.deleteFiles(idsToDelete)
+    }
+
+    /** 递归收集文件夹下的所有后代文件 ID */
+    private suspend fun collectDescendantIds(folderId: String, result: MutableSet<String>) {
+        val childIds = fileDao.getChildIdsByParent(folderId)
+        for (childId in childIds) {
+            if (childId !in result) {
+                result += childId
+                collectDescendantIds(childId, result)
+            }
+        }
     }
 
     /** 重命名文件 */

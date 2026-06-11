@@ -164,6 +164,15 @@ interface FileDao {
     suspend fun deleteFiles(ids: List<String>)
 
     /**
+     * 获取指定文件夹下的直接子文件 ID 列表（含已删除）。
+     *
+     * 仅用于递归删除场景：需要遍历已删除文件夹的子树，
+     * 因此不过滤 isDeleted。
+     */
+    @Query("SELECT fileId FROM files WHERE parentId = :parentId")
+    suspend fun getChildIdsByParent(parentId: String): List<String>
+
+    /**
      * 获取指定文件夹下的所有文件（挂起版本，非 Flow）。
      *
      * 用于事务内读取（如递归复制文件树），避免 Flow 在事务中
