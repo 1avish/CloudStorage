@@ -31,6 +31,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +54,7 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 // ── TXT 阅读器入口 ──
 
@@ -212,11 +214,28 @@ private fun TxtPagerContent(
     }
 
     val pagerState = rememberPagerState(pageCount = { uiState.pages.size })
+    val pendingPageRestoreFraction = remember { mutableStateOf<Float?>(null) }
+    val lastPaginatedFileKey = remember { mutableStateOf<String?>(null) }
 
-    // 分页完成时防止页码越界
-    LaunchedEffect(uiState.pages.size) {
-        if (!uiState.isPaginating && pagerState.currentPage >= uiState.pages.size) {
-            pagerState.scrollToPage((uiState.pages.lastIndex).coerceAtLeast(0))
+    // 分页完成时防止页码越界；设置变化触发重新分页时，尽量保持原阅读进度。
+    LaunchedEffect(uiState.pages.size, uiState.isPaginating) {
+        val pageCount = uiState.pages.size
+        if (pageCount == 0) return@LaunchedEffect
+
+        pendingPageRestoreFraction.value?.let { fraction ->
+            val targetPage = (uiState.pages.lastIndex * fraction)
+                .roundToInt()
+                .coerceIn(0, uiState.pages.lastIndex)
+            if (pagerState.currentPage != targetPage) {
+                pagerState.scrollToPage(targetPage)
+            }
+            if (!uiState.isPaginating) {
+                pendingPageRestoreFraction.value = null
+            }
+        } ?: run {
+            if (!uiState.isPaginating && pagerState.currentPage >= pageCount) {
+                pagerState.scrollToPage(uiState.pages.lastIndex)
+            }
         }
     }
 
@@ -257,10 +276,15 @@ private fun TxtPagerContent(
                 // 触发分页
                 LaunchedEffect(fileKey, fileName, fileUri, contentWidthPx, maxLines, uiState.fontSizeIndex, uiState.lineSpacingIndex) {
                     viewModel.markFileOpened(fileId)
-                    viewModel.startPagination()
-                    if (pagerState.currentPage != 0) {
-                        pagerState.scrollToPage(0)
+                    pendingPageRestoreFraction.value = if (lastPaginatedFileKey.value == fileKey && uiState.pages.size > 1) {
+                        pagerState.currentPage
+                            .coerceIn(0, uiState.pages.lastIndex)
+                            .toFloat() / uiState.pages.lastIndex
+                    } else {
+                        null
                     }
+                    lastPaginatedFileKey.value = fileKey
+                    viewModel.startPagination()
 
                     val paginationStartMs: Long
                     var firstPageLogged = false
