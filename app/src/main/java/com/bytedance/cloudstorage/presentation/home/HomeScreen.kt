@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -364,7 +365,7 @@ private fun RecentFileCard(
                     modifier = Modifier.size(30.w.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Visibility,
+                        imageVector = if (expanded) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                         contentDescription = if (expanded) "折叠" else "展开",
                         tint = Color(0xFF737373),
                         modifier = Modifier.size(18.w.dp)
